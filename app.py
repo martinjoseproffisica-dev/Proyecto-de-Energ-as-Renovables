@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
+from pathlib import Path
 
 st.set_page_config(page_title="Energía renovable · Cruz del Eje", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
@@ -50,7 +51,7 @@ footer {visibility:hidden;}
 with st.sidebar:
     st.markdown("## ⚡ Energía renovable")
     st.caption("Investigación educativa · Cruz del Eje")
-    pages = ["Inicio", "La investigación", "Mapa energético local", "Cruz del Eje", "Registro de campo", "Laboratorio hidráulico 3D", "Compostaje y calor", "Propuestas didácticas", "Resultados y conclusiones"]
+    pages = ["Presentación del equipo", "Inicio", "La investigación", "Mapa energético local", "Cruz del Eje", "Registro de campo", "Laboratorio hidráulico 3D", "Compostaje y calor", "Propuestas didácticas", "Resultados y conclusiones"]
     def set_page(target):
         st.session_state["nav_page"] = target
         st.session_state["_scroll_to_top"] = True
@@ -86,7 +87,45 @@ def heading(kicker, title, desc=None):
 def metric_card(kicker, number, desc):
     st.markdown(f'<div class="card"><div class="kicker">{kicker}</div><div class="big-number">{number}</div><div>{desc}</div></div>', unsafe_allow_html=True)
 
-if page == "Inicio":
+if page == "Presentación del equipo":
+    st.markdown("""
+    <div class="hero">
+      <div class="eyebrow">Profesorado Universitario de Física · UPC · 2026</div>
+      <h1>La energía renovable como contenido escolar</h1>
+      <p>Una experiencia de investigación, territorio y enseñanza en Cruz del Eje.</p>
+      <div><span class="pill">Investigación educativa</span><span class="pill">Energías renovables</span><span class="pill">Contexto local</span></div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.write("")
+    photo_path = Path("assets/equipo_estudiantes.jpg")
+    photo_col, info_col = st.columns([1.25, 1], gap="large")
+    with photo_col:
+        if photo_path.exists():
+            st.image(str(photo_path), use_container_width=True, caption="Equipo de estudiantes")
+        else:
+            st.markdown("""
+            <div style="min-height:320px;border:2px dashed #9bb7a8;border-radius:18px;background:#e8f0e9;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;color:#244b3e">
+              <div style="font-size:3.5rem">👥</div>
+              <h3 style="color:#244b3e">Fotografía del equipo</h3>
+              <p>Subí la imagen grupal a la carpeta <b>assets</b> con el nombre<br><b>equipo_estudiantes.jpg</b></p>
+            </div>
+            """, unsafe_allow_html=True)
+    with info_col:
+        st.markdown("<div class='section-label'>Quiénes somos</div>", unsafe_allow_html=True)
+        st.markdown("### Equipo de investigación")
+        st.write("Estudiantes del Profesorado Universitario de Física de la Universidad Provincial de Córdoba, sede Cruz del Eje.")
+        st.markdown("#### Integrantes")
+        # Reemplazar estos marcadores por los nombres y apellidos reales del equipo.
+        team_members = ["Nombre y apellido del/de la estudiante 1", "Nombre y apellido del/de la estudiante 2", "Nombre y apellido del/de la estudiante 3"]
+        for member in team_members:
+            st.markdown(f"- {member}")
+        st.markdown("<div class='callout'><b>Proyecto académico · 2026</b><br>La energía renovable como contenido escolar.</div>", unsafe_allow_html=True)
+        st.caption("Para personalizar esta portada, editá la lista team_members en app.py y reemplazá los nombres de ejemplo.")
+    st.write("")
+    if st.button("Comenzar la presentación →", type="primary", use_container_width=True):
+        set_page("Inicio")
+
+elif page == "Inicio":
     st.markdown("""
     <div class="hero">
       <div class="eyebrow">Investigación · Educación · Territorio</div>
