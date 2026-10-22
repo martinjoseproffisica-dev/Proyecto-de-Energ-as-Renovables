@@ -1,30 +1,29 @@
-# La energía renovable como contenido escolar
+# La energía renovable como contenido escolar (versión 7)
 
-Aplicación académica interactiva desarrollada con Streamlit y Plotly para presentar una investigación sobre la enseñanza de las energías renovables en Cruz del Eje, Córdoba.
+Aplicación académica interactiva con Streamlit, Plotly y three.js.
 
-## Portada del equipo
-La primera pantalla es **Presentación del equipo**. Para mostrar la foto grupal, cargá la imagen en la carpeta `assets/` con este nombre exacto: `equipo_estudiantes.jpg`. La ruta completa debe ser `assets/equipo_estudiantes.jpg`. Si la foto aún no está, la aplicación muestra un recuadro de reemplazo y sigue funcionando.
+## Qué cambió en esta versión
+- **Portada**: solo la foto del equipo y todos los datos (integrantes, espacios curriculares, profesores). El cartel verde queda en «Inicio».
+- **Temas**: cuatro opciones arriba a la derecha (Bosque, Océano, Atardecer, Noche).
+- **Navegación**: al tocar «Siguiente», «Anterior», «Comenzar» o el menú, la página vuelve al comienzo.
+- **Contenido nuevo desde la presentación**: antecedentes, hipótesis, método, análisis curricular, voces docentes, contraste de hipótesis, limitaciones y cierre.
+- **Laboratorio hidráulico**: turbina 3D con corte, vista explosionada, flujo de agua animado y gráficos de potencia.
+- **Compostaje**: corte de la pila con temperaturas, curva por fases y balance de calor.
 
-Para cambiar los nombres de ejemplo, editá la lista `team_members` en `app.py` dentro de la sección `Presentación del equipo`. Agregá o quitá integrantes según corresponda.
+## Archivos
+- `app.py`, `requirements.txt`, `.streamlit/config.toml`
+- `componentes/turbina3d.html` (modelo 3D)
+- `assets/` (conservá tus fotos y el video: `equipo_estudiantes.jpg`, `relevamiento_01.jpg` … `relevamiento_20.jpg`, `registro_visita.mp4`)
 
-## Contenidos
-- Presentación del proyecto, objetivos, metodología y resultados.
-- Mapa energético local con el dique, IPEA N.º 211, central El Ferroviario y la ubicación más reciente publicada para el proyecto de parque solar.
-- Laboratorio hidráulico 3D y cálculo de potencia.
-- Simulación conceptual de compostaje y estimación del calor transferido al agua.
-- Propuestas didácticas para los niveles inicial, primario, secundario y superior.
-- Galería de fotografías y video del relevamiento de campo.
-- Accesos a legislación ambiental y fuentes técnicas.
+## Fotos nuevas que podés sumar a `assets/`
+- `ingreso_cruz_del_eje.jpg`: ingreso a la ciudad (sección «Cruz del Eje»).
+- `dique_cruz_del_eje.jpg`: dique (secciones «Cruz del Eje» y «Mapa energético local»).
+- `ipea_211.jpg`: foto del IPEA (opcional, sección «Mapa energético local»).
+- `figura_saberes.png` y `figura_normativa.png` ya vienen incluidas.
+Si una foto no está, la app muestra un recuadro con el nombre exacto del archivo.
 
 ## Ejecución local
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
-
-## Publicación en Streamlit Community Cloud
-1. Subir `app.py`, `requirements.txt`, `.streamlit/config.toml`, `README.md` y `assets/` a un repositorio GitHub. Conservá los nombres de los archivos existentes y agregá `assets/equipo_estudiantes.jpg` cuando tengas la fotografía grupal.
-2. Crear una aplicación en Streamlit Community Cloud y seleccionar ese repositorio, la rama `main` y el archivo `app.py`.
-
-## Criterio de lectura de los datos
-Los resultados de la investigación, los valores informados en el relevamiento y las simulaciones didácticas se presentan diferenciados. Las ubicaciones del mapa se acompañan con enlaces a sus fuentes. El expediente ambiental difundido en 2026 ubica el proyecto de parque solar en Pedanía San Marcos; un documento de EPEC de 2022 consignaba otro emplazamiento, por lo que ambos antecedentes se distinguen en la aplicación.

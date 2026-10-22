@@ -1,245 +1,531 @@
-import streamlit as st
-import plotly.graph_objects as go
-import numpy as np
+import json
 from pathlib import Path
+from string import Template
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
 
 st.set_page_config(page_title="Energía renovable · Cruz del Eje", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-:root { --ink:#142b2b; --muted:#55706b; --green:#146b55; --lime:#c9f36b; --paper:#f5f7f1; }
-html, body, [class*="css"] { font-family:'DM Sans',sans-serif; }
-/* Contraste accesible para controles y datos */
-.stApp, [data-testid="stAppViewContainer"] { color:#142b2b !important; }
-.stMarkdown, .stMarkdown p, .stMarkdown li, label, [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p { color:#142b2b !important; }
-[data-testid="stSlider"] label, [data-testid="stNumberInput"] label, [data-testid="stSelectbox"] label { color:#142b2b !important; font-weight:700 !important; }
-[data-testid="stSlider"] [data-testid="stTickBar"] + div, [data-testid="stSlider"] [data-testid="stThumbValue"] { color:#142b2b !important; }
-[data-testid="stNumberInput"] input, [data-testid="stTextInput"] input { color:#142b2b !important; background:#ffffff !important; }
-[data-testid="stMetricValue"] { color:#146b55 !important; }
-.stButton button, .stLinkButton a { border-radius:12px !important; font-weight:700 !important; background:#ffffff !important; color:#173b35 !important; border:1px solid #b8cec4 !important; }
-.stButton button:hover, .stLinkButton a:hover { background:#e4f2e9 !important; color:#103b31 !important; border-color:#43836d !important; }
-.stButton button[kind="primary"], .stButton button[data-testid*="baseButton-primary"] { background:#146b55 !important; color:#ffffff !important; border:1px solid #146b55 !important; }
-.stButton button[kind="primary"] *, .stButton button[data-testid*="baseButton-primary"] * { color:#ffffff !important; }
-.stMarkdown a { color:#075f88 !important; text-decoration:underline !important; font-weight:600; }
-[data-testid="stSlider"] [data-testid="stThumbValue"] { background:#146b55 !important; color:#ffffff !important; }
-[data-testid="stSlider"] [data-testid="stTickBar"] div { color:#142b2b !important; }
-[data-testid="stMetricLabel"] { color:#34554d !important; }
-.stAlert, [data-testid="stAlert"] * { color:#142b2b !important; }
-.nav-note { color:#55706b; font-size:.9rem; }
-[data-testid="stPlotlyChart"] { border-radius:14px; overflow:hidden; }
-.stApp { background:var(--paper); color:var(--ink); }
-[data-testid="stSidebar"] { background:#102f2d; }
-[data-testid="stSidebar"] * { color:#f4f7ed !important; }
-h1,h2,h3 { font-family:'Space Grotesk',sans-serif !important; letter-spacing:-.035em; }
-.hero { padding:2.8rem 2.8rem 2.5rem; border-radius:24px; color:white; background:linear-gradient(110deg,rgba(9,39,36,.94),rgba(20,107,85,.65)),url('https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1800&q=85'); background-size:cover;background-position:center; min-height:370px; display:flex; flex-direction:column; justify-content:flex-end; }
-.eyebrow { text-transform:uppercase; letter-spacing:.16em; font-size:.75rem; font-weight:700; color:#d7f69a; }
-.hero h1 { color:white; font-size:clamp(2.5rem,5vw,4.7rem); line-height:.98; max-width:850px; margin:.8rem 0 1rem; }
-.hero p { color:#eef7ec; font-size:1.12rem; max-width:720px; }
-.pill { display:inline-block; padding:.35rem .75rem; border:1px solid rgba(255,255,255,.4); border-radius:99px; font-size:.8rem; margin:.15rem .25rem .15rem 0; }
-.card { background:white; padding:1.25rem 1.35rem; border:1px solid #e1e9df; border-radius:18px; height:100%; box-shadow:0 6px 24px rgba(21,54,43,.035); }
-.card .kicker { color:var(--green); font-size:.75rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; }
-.card h3 { margin:.4rem 0; }
-.big-number { font-family:'Space Grotesk',sans-serif; font-size:2.1rem; font-weight:700; color:var(--green); }
-.section-label { color:var(--green); font-weight:700; text-transform:uppercase; letter-spacing:.14em; font-size:.75rem; }
-.callout { background:#e8f3dd; border-left:4px solid #78a943; padding:1rem 1.2rem; border-radius:0 12px 12px 0; }
-.small-muted { color:#60756d; font-size:.88rem; }
-footer {visibility:hidden;}
-</style>
-""", unsafe_allow_html=True)
+BASE = Path(__file__).parent
+ASSETS = BASE / "assets"
 
+# ───────────────────────── Compatibilidad entre versiones de Streamlit ─────────────────────────
+def _version():
+    try:
+        return tuple(int(x) for x in st.__version__.split(".")[:2])
+    except Exception:
+        return (1, 40)
+
+STRETCH = {"width": "stretch"} if _version() >= (1, 50) else {"use_container_width": True}
+
+
+def embed_html(html: str, height: int):
+    """Muestra una página HTML con JavaScript (st.iframe en versiones nuevas, components.html en las anteriores)."""
+    if hasattr(st, "iframe"):
+        st.iframe(html, height=height)
+    else:
+        import streamlit.components.v1 as components
+        components.html(html, height=height)
+
+
+# ───────────────────────── Datos del equipo ─────────────────────────
+TEAM = ["Martín José", "Moreno Florencia", "Saltos Sabrina", "Luna Lizeth", "Heredia Lucas"]
+SUBJECTS = ["Metodología de la Investigación", "Educación Ambiental Integral", "Energías Renovables"]
+PROFESSORS = ["Naserala Francisco", "Rodríguez Silvana", "Nieto Julieta"]
+
+# ───────────────────────── Temas de color ─────────────────────────
+THEMES = {
+    "Bosque": dict(icon="🟢", bg="#F5F7F1", surface="#FFFFFF", surface2="#E8F0E9", ink="#142B2B", muted="#55706B", primary="#146B55",
+                   primaryInk="#FFFFFF", border="#DCE6DA", accent="#C9F36B", sidebar="#102F2D", sidebarInk="#F4F7ED", calloutBg="#E8F3DD",
+                   calloutBar="#78A943", link="#075F88", heroA="9,39,36", heroB="20,107,85", mapStyle="open-street-map", hue="0deg",
+                   warn="#D9822B", sceneTop="#e9f1ec", sceneBottom="#b7c9c2", grid="#8fa79e", dark=False,
+                   c1="#16836A", c2="#E1A52E", c3="#2864B4"),
+    "Océano": dict(icon="🔵", bg="#F0F6FA", surface="#FFFFFF", surface2="#E2EEF6", ink="#0F2638", muted="#4F6A7D", primary="#0B5C8A",
+                   primaryInk="#FFFFFF", border="#D3E2EC", accent="#9BE0FF", sidebar="#0B2A42", sidebarInk="#EAF4FB", calloutBg="#DCEBF6",
+                   calloutBar="#2F86B8", link="#0B5C8A", heroA="6,32,54", heroB="11,92,138", mapStyle="open-street-map", hue="39deg",
+                   warn="#D9822B", sceneTop="#e8f1f8", sceneBottom="#b4c9d8", grid="#8ba5b8", dark=False,
+                   c1="#0B7DB5", c2="#E1A52E", c3="#1B4F9C"),
+    "Atardecer": dict(icon="🟠", bg="#FBF5EC", surface="#FFFFFF", surface2="#F6E7D3", ink="#2E1B12", muted="#7A5C4A", primary="#B4541A",
+                      primaryInk="#FFFFFF", border="#EADBC6", accent="#FFD18A", sidebar="#3A1F14", sidebarInk="#FBEFE2", calloutBg="#FBE6CF",
+                      calloutBar="#E08A2E", link="#8A3B0E", heroA="58,24,12", heroB="180,84,26", mapStyle="open-street-map", hue="-141deg",
+                      warn="#2A6FB0", sceneTop="#f6ebdc", sceneBottom="#d9bfa3", grid="#b99b80", dark=False,
+                      c1="#C4571A", c2="#2A6FB0", c3="#7A3B12"),
+    "Noche": dict(icon="⚫", bg="#0E1A1B", surface="#162A2C", surface2="#1C3436", ink="#E8F1EE", muted="#9DB5AF", primary="#4FD1A5",
+                  primaryInk="#06231B", border="#2A4443", accent="#C9F36B", sidebar="#091112", sidebarInk="#E8F1EE", calloutBg="#1C3B37",
+                  calloutBar="#4FD1A5", link="#7CC7F2", heroA="4,18,18", heroB="20,107,85", mapStyle="carto-darkmatter", hue="0deg",
+                  warn="#F0B24A", sceneTop="#14282a", sceneBottom="#0a1516", grid="#35504f", dark=True,
+                  c1="#4FD1A5", c2="#F0B24A", c3="#7CC7F2"),
+}
+
+PAGES = ["Presentación del equipo", "Inicio", "La investigación", "Documentos y docentes", "Mapa energético local", "Cruz del Eje",
+         "Registro de campo", "Laboratorio hidráulico 3D", "Compostaje y calor", "Propuestas didácticas", "Resultados y conclusiones"]
+
+# ───────────────────────── Estado y navegación ─────────────────────────
+ss = st.session_state
+ss.setdefault("theme", "Bosque")
+ss.setdefault("page", PAGES[0])
+ss.setdefault("nav_count", 0)
+ss.setdefault("scroll_pending", False)
+
+
+def go_to(page):
+    """Cambia de sección y pide volver al comienzo de la página."""
+    ss["page"] = page
+    ss["nav_count"] += 1
+    ss["scroll_pending"] = True
+
+
+def set_theme(name):
+    ss["theme"] = name
+
+
+T = THEMES[ss["theme"]]
+
+# ───────────────────────── Estilos ─────────────────────────
+CSS = Template("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+:root { --bg:$bg; --surface:$surface; --surface2:$surface2; --ink:$ink; --muted:$muted; --primary:$primary; --primaryInk:$primaryInk;
+        --border:$border; --accent:$accent; --callout:$calloutBg; --calloutBar:$calloutBar; --link:$link; --warn:$warn; }
+html, body, [class*="css"] { font-family:'DM Sans',sans-serif; }
+.stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background:var(--bg) !important; color:var(--ink) !important; }
+[data-testid="stHeader"] { background:transparent !important; }
+[data-testid="stHeader"] * { color:var(--ink) !important; }
+[data-testid="stToolbar"] { opacity:.85; }
+.block-container { padding-top:2.2rem !important; max-width:1280px; }
+h1,h2,h3,h4 { font-family:'Space Grotesk',sans-serif !important; letter-spacing:-.03em; color:var(--ink) !important; }
+[data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] li,
+label, [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p { color:var(--ink) !important; }
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color:var(--muted) !important; }
+[data-testid="stMarkdownContainer"] a, .stMarkdown a { color:var(--link) !important; text-decoration:underline; font-weight:600; }
+hr { border-color:var(--border) !important; }
+
+/* Barra lateral */
+[data-testid="stSidebar"] { background:$sidebar !important; }
+[data-testid="stSidebar"] * { color:$sidebarInk !important; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent !important; border:1px solid transparent !important;
+    justify-content:flex-start !important; text-align:left; font-weight:500 !important; padding:.35rem .7rem !important; border-radius:10px !important; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:rgba(255,255,255,.10) !important; border-color:rgba(255,255,255,.25) !important; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:$accent !important; border:1px solid $accent !important;
+    justify-content:flex-start !important; text-align:left; font-weight:700 !important; padding:.35rem .7rem !important; border-radius:10px !important; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"], [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] * { color:#102F2D !important; }
+[data-testid="stSidebar"] hr { border-color:rgba(255,255,255,.18) !important; }
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"], [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p, [data-testid="stSidebar"] [data-testid="stCaptionContainer"] * { color:$sidebarInk !important; }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * { opacity:.78; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] [data-testid="stMarkdownContainer"] p { color:#102F2D !important; }
+[data-testid="stSidebar"] button > div { width:100%; justify-content:flex-start !important; text-align:left; }
+[data-testid="stSidebar"] button p { text-align:left; }
+
+/* Botones */
+.stButton button, .stLinkButton a, [data-testid="stBaseButton-secondary"], [data-testid="stBaseButton-primary"] { border-radius:12px !important; font-weight:700 !important; }
+[data-testid="stMain"] [data-testid="stBaseButton-secondary"], .stLinkButton a { background:var(--surface) !important; color:var(--ink) !important; border:1px solid var(--border) !important; }
+[data-testid="stMain"] [data-testid="stBaseButton-secondary"] *, .stLinkButton a * { color:var(--ink) !important; }
+[data-testid="stMain"] [data-testid="stBaseButton-secondary"]:hover, .stLinkButton a:hover { background:var(--surface2) !important; border-color:var(--primary) !important; }
+[data-testid="stMain"] [data-testid="stBaseButton-primary"] { background:var(--primary) !important; border:1px solid var(--primary) !important; }
+[data-testid="stMain"] [data-testid="stBaseButton-primary"], [data-testid="stMain"] [data-testid="stBaseButton-primary"] * { color:var(--primaryInk) !important; }
+[data-testid="stMain"] [data-testid="stBaseButton-primary"]:hover { filter:brightness(1.08); }
+
+/* Controles */
+[data-testid="stSlider"] [data-baseweb="slider"] { filter:hue-rotate($hue); }
+[data-testid="stSlider"] [data-testid="stTickBarMin"], [data-testid="stSlider"] [data-testid="stTickBarMax"], [data-testid="stSliderThumbValue"], [data-testid="stSlider"] div { color:var(--ink) !important; }
+[data-testid="stNumberInput"] input, [data-testid="stTextInput"] input { color:var(--ink) !important; background:var(--surface) !important; }
+[data-testid="stNumberInput"] > div > div { background:var(--surface) !important; border-color:var(--border) !important; }
+[data-testid="stNumberInput"] button { background:var(--surface2) !important; color:var(--ink) !important; }
+[data-testid="stMetricValue"] { color:var(--primary) !important; }
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { color:var(--muted) !important; }
+[data-testid="stAlert"] { background:var(--callout) !important; border:1px solid var(--border) !important; }
+[data-testid="stAlert"] * { color:var(--ink) !important; }
+[data-testid="stExpander"] { background:var(--surface) !important; border:1px solid var(--border) !important; border-radius:14px !important; }
+[data-testid="stExpander"] * { color:var(--ink) !important; }
+.stTabs [data-baseweb="tab-list"] { gap:.25rem; border-bottom:1px solid var(--border); }
+.stTabs [data-baseweb="tab"] { color:var(--muted) !important; font-weight:600; }
+.stTabs [aria-selected="true"] { color:var(--primary) !important; }
+.stTabs [data-baseweb="tab-highlight"] { background:var(--primary) !important; }
+.stTabs [data-baseweb="tab-border"] { background:var(--border) !important; }
+[data-testid="stPlotlyChart"], [data-testid="stImage"] img { border-radius:14px; overflow:hidden; }
+[data-testid="stIFrame"] iframe, iframe { border:0; border-radius:16px; color-scheme:normal; }
+footer { visibility:hidden; }
+
+/* Barra superior con selector de tema */
+.topbrand { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.05rem; color:var(--ink); padding-top:.45rem; }
+.topbrand small { display:block; font-family:'DM Sans',sans-serif; font-weight:500; font-size:.78rem; color:var(--muted); }
+.themelabel { text-align:right; font-size:.8rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding-top:.7rem; }
+
+/* Componentes propios */
+.hero { padding:2.8rem 2.8rem 2.5rem; border-radius:24px; color:#fff; min-height:370px; display:flex; flex-direction:column; justify-content:flex-end;
+  background:linear-gradient(110deg,rgba($heroA,.94),rgba($heroB,.65)),url('https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1800&q=85');
+  background-size:cover; background-position:center; }
+.hero * { color:#fff !important; }
+.hero .eyebrow { color:#d7f69a !important; }
+.eyebrow { text-transform:uppercase; letter-spacing:.16em; font-size:.75rem; font-weight:700; color:var(--primary); }
+.hero h1 { font-size:clamp(2.5rem,5vw,4.7rem); line-height:.98; max-width:850px; margin:.8rem 0 1rem; }
+.hero p { color:#eef7ec !important; font-size:1.12rem; max-width:720px; }
+.pill { display:inline-block; padding:.35rem .75rem; border:1px solid rgba(255,255,255,.45); border-radius:99px; font-size:.8rem; margin:.15rem .25rem .15rem 0; }
+.card { background:var(--surface); padding:1.15rem 1.3rem; border:1px solid var(--border); border-radius:18px; height:100%; box-shadow:0 6px 24px rgba(0,0,0,.04); }
+.card .kicker, .kicker { color:var(--primary); font-size:.74rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; }
+.card h3 { margin:.35rem 0 .3rem; font-size:1.18rem; }
+.card p { margin:.2rem 0 0; font-size:.95rem; color:var(--ink); }
+.card .muted, .small-muted { color:var(--muted); font-size:.88rem; }
+.big-number { font-family:'Space Grotesk',sans-serif; font-size:2.2rem; font-weight:700; color:var(--primary); line-height:1.1; }
+.section-label { color:var(--primary); font-weight:700; text-transform:uppercase; letter-spacing:.14em; font-size:.75rem; }
+.callout { background:var(--callout); border-left:4px solid var(--calloutBar); padding:1rem 1.2rem; border-radius:0 12px 12px 0; color:var(--ink); }
+.callout * { color:var(--ink) !important; }
+.nav-note { color:var(--muted); font-size:.9rem; }
+.name-chip { display:flex; align-items:center; gap:.65rem; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:.55rem .8rem; font-weight:600; }
+.name-chip i { width:30px; height:30px; border-radius:50%; background:var(--primary); color:var(--primaryInk); display:flex; align-items:center; justify-content:center; font-style:normal; font-size:.8rem; flex:none; }
+.ph { min-height:260px; border:2px dashed var(--border); border-radius:18px; background:var(--surface2); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:1.4rem; color:var(--muted); }
+.ph b { color:var(--ink); }
+table.tbl { width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--border); border-radius:14px; overflow:hidden; background:var(--surface); font-size:.93rem; }
+table.tbl th { background:var(--primary); color:var(--primaryInk); text-align:left; padding:.6rem .8rem; font-weight:700; }
+table.tbl td { padding:.6rem .8rem; border-top:1px solid var(--border); color:var(--ink); vertical-align:top; }
+table.tbl tr:nth-child(even) td { background:var(--surface2); }
+table.tbl td.dim { color:var(--muted); }
+.flow { display:flex; flex-wrap:wrap; gap:.6rem; align-items:stretch; }
+.flow .step { flex:1 1 150px; background:var(--surface); border:1px solid var(--border); border-top:5px solid var(--primary); border-radius:14px; padding:.75rem .85rem; position:relative; }
+.flow .step b { display:block; font-size:.95rem; }
+.flow .step span { display:block; font-size:.82rem; color:var(--muted); margin-top:.15rem; }
+.flow .step em { display:inline-block; font-style:normal; font-size:.74rem; font-weight:700; background:var(--callout); color:var(--ink); border-radius:99px; padding:.1rem .55rem; margin-top:.4rem; }
+.flow .step:not(:last-child):after { content:"→"; position:absolute; right:-.62rem; top:42%; color:var(--primary); font-weight:700; background:var(--bg); border-radius:50%; width:1.1rem; text-align:center; z-index:2; }
+.cgrid { display:grid; gap:1rem; margin:0 0 1rem; }
+@media (max-width:900px){ .cgrid { grid-template-columns:1fr !important; } }
+.badge { display:inline-block; font-size:.72rem; font-weight:700; padding:.12rem .55rem; border-radius:99px; background:var(--callout); color:var(--ink); border:1px solid var(--border); }
+.phase { border-radius:16px; padding:1rem 1.2rem; border:1px solid var(--border); background:var(--surface); border-left:8px solid var(--primary); }
+.phase h3 { margin:.1rem 0 .3rem; }
+</style>
+""")
+st.markdown(CSS.substitute(**T), unsafe_allow_html=True)
+
+# Al cambiar de sección, la página vuelve al comienzo. El contador cambia el texto del script
+# en cada navegación para que el navegador lo ejecute siempre (si el texto fuera idéntico, se reutilizaría).
+if ss.pop("scroll_pending", False):
+    embed_html(
+        """<script>/* nav %d */
+        (function(){
+          function up(){
+            try{
+              var d = window.parent.document;
+              ['[data-testid="stMain"]','section.main','[data-testid="stAppViewContainer"]','.main'].forEach(function(s){
+                var e = d.querySelector(s); if(e){ e.scrollTop = 0; if(e.scrollTo){ e.scrollTo(0,0); } }
+              });
+              window.parent.scrollTo(0,0);
+            }catch(err){}
+          }
+          up(); [30,120,300,700,1400].forEach(function(t){ setTimeout(up,t); });
+        })();
+        </script>""" % ss["nav_count"], height=1)
+
+# ───────────────────────── Utilidades de interfaz ─────────────────────────
+def heading(kicker, title, desc=None):
+    st.markdown(f'<div class="section-label">{kicker}</div><h1 style="margin-top:.2rem">{title}</h1>', unsafe_allow_html=True)
+    if desc:
+        st.markdown(desc)
+
+
+def card_html(kicker, title, body, extra=""):
+    k = f'<div class="kicker">{kicker}</div>' if kicker else ""
+    return f'<div class="card">{k}<h3>{title}</h3><p>{body}</p>{extra}</div>'
+
+
+def metric_card(kicker, number, desc):
+    return f'<div class="card"><div class="kicker">{kicker}</div><div class="big-number">{number}</div><div>{desc}</div></div>'
+
+
+def cards(items, cols=None):
+    """items: lista de HTML ya armado; se reparten en filas de una grilla de alto parejo."""
+    cols = cols or len(items)
+    for start in range(0, len(items), cols):
+        row = items[start:start + cols]
+        st.markdown(f'<div class="cgrid" style="grid-template-columns:repeat({len(row)},minmax(0,1fr))">{"".join(row)}</div>', unsafe_allow_html=True)
+
+
+def table_html(headers, rows, widths=None):
+    ths = "".join(f'<th style="width:{w}%">{h}</th>' if widths else f"<th>{h}</th>" for h, w in zip(headers, widths or headers))
+    trs = ""
+    for r in rows:
+        trs += "<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>"
+    return f'<table class="tbl"><thead><tr>{ths}</tr></thead><tbody>{trs}</tbody></table>'
+
+
+def callout(html):
+    st.markdown(f'<div class="callout">{html}</div>', unsafe_allow_html=True)
+
+
+def find_asset(*stems):
+    for stem in stems:
+        for ext in (".jpg", ".jpeg", ".png", ".webp", ".JPG", ".JPEG", ".PNG"):
+            p = ASSETS / f"{stem}{ext}"
+            if p.exists():
+                return p
+    return None
+
+
+def photo(stems, caption, missing_title, height=260):
+    p = find_asset(*stems)
+    if p:
+        st.image(str(p), caption=caption, **STRETCH)
+    else:
+        st.markdown(f'<div class="ph" style="min-height:{height}px"><div style="font-size:2.4rem">🖼️</div><b>{missing_title}</b>'
+                    f'<span>Guardá la foto en <b>assets/{stems[0]}.jpg</b></span></div>', unsafe_allow_html=True)
+
+
+def plot(fig, **kw):
+    st.plotly_chart(fig, **STRETCH, **kw)
+
+
+def base_layout(fig, height=330, **kw):
+    fig.update_layout(height=height, margin=dict(l=10, r=10, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(color=T["ink"], family="DM Sans, sans-serif"), **kw)
+    fig.update_layout(title_font_color=T["ink"])
+    return fig
+
+
+# ───────────────────────── Barra lateral y barra superior ─────────────────────────
 with st.sidebar:
     st.markdown("## ⚡ Energía renovable")
     st.caption("Investigación educativa · Cruz del Eje")
-    pages = ["Presentación del equipo", "Inicio", "La investigación", "Mapa energético local", "Cruz del Eje", "Registro de campo", "Laboratorio hidráulico 3D", "Compostaje y calor", "Propuestas didácticas", "Resultados y conclusiones"]
-    def set_page(target):
-        st.session_state["nav_page"] = target
-        st.session_state["_scroll_to_top"] = True
-    def mark_scroll_to_top():
-        st.session_state["_scroll_to_top"] = True
-    page = st.radio("RECORRIDO", pages, label_visibility="collapsed", key="nav_page", on_change=mark_scroll_to_top)
+    for i, p in enumerate(PAGES):
+        label = p if i == 0 else f"{i:02d} · {p}"
+        st.button(label, key=f"nav_{i}", on_click=go_to, args=(p,), type="primary" if p == ss["page"] else "secondary", **STRETCH)
     st.divider()
     st.markdown("**Profesorado Universitario de Física**")
     st.caption("UPC · Sede Cruz del Eje · 2026")
     st.caption("Proyecto académico interactivo")
 
-# Al cambiar de sección, la presentación comienza desde el encabezado.
-if st.session_state.pop("_scroll_to_top", False):
-    st.components.v1.html("""
-    <script>
-    const goTop = () => {
-      try {
-        window.parent.scrollTo({top: 0, left: 0, behavior: 'instant'});
-        const main = window.parent.document.querySelector('[data-testid="stMain"]');
-        const app = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-        if (main) main.scrollTo({top: 0, left: 0, behavior: 'instant'});
-        if (app) app.scrollTo({top: 0, left: 0, behavior: 'instant'});
-      } catch (e) { window.parent.scrollTo(0, 0); }
-    };
-    goTop(); setTimeout(goTop, 120);
-    </script>
-    """, height=0)
+top = st.columns([1.9, 0.5, 1, 1, 1, 1], vertical_alignment="center")
+with top[0]:
+    st.markdown('<div class="topbrand">La energía renovable como contenido escolar<small>Profesorado Universitario de Física · UPC · 2026</small></div>', unsafe_allow_html=True)
+with top[1]:
+    st.markdown('<div class="themelabel">Tema</div>', unsafe_allow_html=True)
+for col, (name, th) in zip(top[2:], THEMES.items()):
+    with col:
+        st.button(f"{th['icon']} {name}", key=f"theme_{name}", on_click=set_theme, args=(name,),
+                  type="primary" if ss["theme"] == name else "secondary", **STRETCH)
+st.write("")
 
-def heading(kicker, title, desc=None):
-    st.markdown(f'<div class="section-label">{kicker}</div><h1>{title}</h1>', unsafe_allow_html=True)
-    if desc: st.markdown(desc)
+page = ss["page"]
 
-def metric_card(kicker, number, desc):
-    st.markdown(f'<div class="card"><div class="kicker">{kicker}</div><div class="big-number">{number}</div><div>{desc}</div></div>', unsafe_allow_html=True)
-
-if page == "Presentación del equipo":
-    st.markdown("""
-    <div class="hero">
-      <div class="eyebrow">Profesorado Universitario de Física · UPC · 2026</div>
-      <h1>La energía renovable como contenido escolar</h1>
-      <p>Una experiencia de investigación, territorio y enseñanza en Cruz del Eje.</p>
-      <div><span class="pill">Investigación educativa</span><span class="pill">Energías renovables</span><span class="pill">Contexto local</span></div>
-    </div>
-    """, unsafe_allow_html=True)
+# ═════════════════════════ PÁGINAS ═════════════════════════
+def page_portada():
+    st.markdown('<div class="eyebrow">Profesorado Universitario de Física · UPC · Sede Cruz del Eje · 4.° año · 2026</div>', unsafe_allow_html=True)
+    st.markdown('<h1 style="font-size:clamp(2.2rem,4.6vw,3.9rem);line-height:1.02;margin:.35rem 0 .4rem">La energía renovable como contenido escolar</h1>', unsafe_allow_html=True)
+    st.markdown("**Análisis curricular y propuestas de transposición didáctica en Cruz del Eje y Córdoba**")
     st.write("")
-    photo_path = Path("assets/equipo_estudiantes.jpg")
-    photo_col, info_col = st.columns([1.25, 1], gap="large")
-    with photo_col:
-        if photo_path.exists():
-            st.image(str(photo_path), use_container_width=True, caption="Equipo de estudiantes")
-        else:
-            st.markdown("""
-            <div style="min-height:320px;border:2px dashed #9bb7a8;border-radius:18px;background:#e8f0e9;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;color:#244b3e">
-              <div style="font-size:3.5rem">👥</div>
-              <h3 style="color:#244b3e">Fotografía del equipo</h3>
-              <p>Subí la imagen grupal a la carpeta <b>assets</b> con el nombre<br><b>equipo_estudiantes.jpg</b></p>
-            </div>
-            """, unsafe_allow_html=True)
-    with info_col:
-        st.markdown("<div class='section-label'>Quiénes somos</div>", unsafe_allow_html=True)
+    left, right = st.columns([1.3, 1], gap="large")
+    with left:
+        photo(["equipo_estudiantes"], "Equipo de investigación", "Fotografía del equipo", height=420)
+    with right:
+        st.markdown('<div class="section-label">Quiénes somos</div>', unsafe_allow_html=True)
         st.markdown("### Equipo de investigación")
-        st.write("Estudiantes del Profesorado Universitario de Física de la Universidad Provincial de Córdoba, sede Cruz del Eje.")
-        st.markdown("#### Integrantes")
-        # Reemplazar estos marcadores por los nombres y apellidos reales del equipo.
-        team_members = ["Nombre y apellido del/de la estudiante 1", "Nombre y apellido del/de la estudiante 2", "Nombre y apellido del/de la estudiante 3"]
-        for member in team_members:
-            st.markdown(f"- {member}")
-        st.markdown("<div class='callout'><b>Proyecto académico · 2026</b><br>La energía renovable como contenido escolar.</div>", unsafe_allow_html=True)
-        st.caption("Para personalizar esta portada, editá la lista team_members en app.py y reemplazá los nombres de ejemplo.")
+        chips = "".join(f'<div class="name-chip"><i>{"".join(w[0] for w in n.split()[:2])}</i>{n}</div>' for n in TEAM)
+        st.markdown(f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">{chips}</div>', unsafe_allow_html=True)
+        st.write("")
+        subj = "".join(f"<li>{s}</li>" for s in SUBJECTS)
+        prof = "".join(f"<li>{p}</li>" for p in PROFESSORS)
+        st.markdown(f'<div class="card"><div class="kicker">Espacios curriculares</div><ul style="margin:.3rem 0 .6rem;padding-left:1.1rem">{subj}</ul>'
+                    f'<div class="kicker">Profesores</div><ul style="margin:.3rem 0 .2rem;padding-left:1.1rem">{prof}</ul></div>', unsafe_allow_html=True)
+        st.write("")
+        st.markdown('<div class="callout"><b>Universidad Provincial de Córdoba</b><br>Profesorado Universitario de Física · Sede Cruz del Eje · 4.° año · 2026</div>', unsafe_allow_html=True)
     st.write("")
-    if st.button("Comenzar la presentación →", type="primary", use_container_width=True):
-        set_page("Inicio")
+    st.button("Comenzar la presentación →", type="primary", on_click=go_to, args=("Inicio",), **STRETCH)
 
-elif page == "Inicio":
-    st.markdown("""
-    <div class="hero">
-      <div class="eyebrow">Investigación · Educación · Territorio</div>
-      <h1>La energía renovable como contenido escolar</h1>
-      <p>Análisis curricular y propuestas de transposición didáctica en Cruz del Eje y Córdoba.</p>
-      <div><span class="pill">Inicial</span><span class="pill">Primario</span><span class="pill">Secundario</span><span class="pill">Superior</span></div>
-    </div>
-    """, unsafe_allow_html=True)
+
+def page_inicio():
+    st.markdown("""<div class="hero"><div class="eyebrow">Investigación · Educación · Territorio</div>
+<h1>La energía renovable como contenido escolar</h1>
+<p>Análisis curricular y propuestas de transposición didáctica en Cruz del Eje y Córdoba.</p>
+<div><span class="pill">Inicial</span><span class="pill">Primario</span><span class="pill">Secundario</span><span class="pill">Superior</span></div></div>""", unsafe_allow_html=True)
     st.write("")
     st.markdown("### Una investigación que conecta el aula con el territorio")
     st.markdown("El proyecto analiza cómo se enseñan las energías renovables en los documentos curriculares y en las prácticas docentes, y qué brechas existen frente al conocimiento físico del potencial energético local.")
-    cols=st.columns(3)
-    with cols[0]: metric_card("Caso de estudio", "Cruz del Eje", "Dique, central hidroeléctrica y parque solar.")
-    with cols[1]: metric_card("Trabajo de campo", "6 docentes", "Entrevistas a docentes de cuatro niveles educativos.")
-    with cols[2]: metric_card("Producto", "4 propuestas", "Una propuesta didáctica para cada nivel educativo.")
-    st.write("")
-    st.markdown('<div class="callout"><b>Idea central</b><br>La ausencia del contexto local en los documentos curriculares no equivale a su ausencia en el aula: su incorporación depende, en gran medida, de la iniciativa docente y de los recursos disponibles.</div>', unsafe_allow_html=True)
+    cards([metric_card("Caso de estudio", "Cruz del Eje", "Dique, central hidroeléctrica y parque solar."),
+           metric_card("Trabajo de campo", "6 docentes", "Entrevistas a docentes de cuatro niveles educativos."),
+           metric_card("Producto", "4 propuestas", "Una propuesta didáctica para cada nivel educativo.")])
+    callout("<b>Idea central</b><br>La ausencia del contexto local en los documentos curriculares no equivale a su ausencia en el aula: su incorporación depende, en gran medida, de la iniciativa docente y de los recursos disponibles.")
     st.write("")
     st.markdown("### Explorar el proyecto")
-    cols=st.columns(3)
-    items=[("01 · Investigación","Pregunta, objetivos, marco teórico y método."),("02 · Territorio","Mapa energético local y recursos del caso."),("03 · Laboratorios","Exploraciones interactivas de potencia hidráulica y calor.")]
-    for c,(t,d) in zip(cols,items):
-        with c: st.markdown(f'<div class="card"><div class="kicker">Explorar</div><h3>{t}</h3><p>{d}</p></div>',unsafe_allow_html=True)
+    cards([card_html("Explorar", "01 · Investigación", "Pregunta, objetivos, marco teórico, hipótesis y método."),
+           card_html("Explorar", "02 · Territorio", "Mapa energético local, fotos y recursos del caso."),
+           card_html("Explorar", "03 · Laboratorios", "Turbina 3D y compostaje: dos simulaciones para razonar con la Física.")])
     st.markdown("### Ir directamente a una sección")
-    jump_cols = st.columns(3)
-    for col, label, target in zip(jump_cols, ["Ver el mapa local", "Abrir laboratorio hidráulico", "Explorar compostaje y calor"], ["Mapa energético local", "Laboratorio hidráulico 3D", "Compostaje y calor"]):
+    cols = st.columns(4)
+    for col, label, target in zip(cols, ["Ver el mapa local", "Abrir el laboratorio hidráulico", "Explorar compostaje y calor", "Ver los resultados"],
+                                  ["Mapa energético local", "Laboratorio hidráulico 3D", "Compostaje y calor", "Resultados y conclusiones"]):
         with col:
-            st.button(label, use_container_width=True, on_click=set_page, args=(target,))
+            st.button(label, key=f"jump_{target}", on_click=go_to, args=(target,), **STRETCH)
 
-elif page == "La investigación":
-    heading("01 · El proyecto", "¿Cómo se enseñan las energías renovables?", "La investigación compara lo que prescriben los documentos, lo que declaran los docentes y el conocimiento físico del potencial energético local.")
-    st.markdown("### Pregunta de investigación")
-    st.markdown('<div class="callout">¿Cómo se enseñan las energías renovables en los documentos curriculares y en las prácticas docentes de los cuatro niveles, y qué brechas hay frente al conocimiento físico del potencial energético local?</div>',unsafe_allow_html=True)
-    st.write("")
-    a,b=st.columns(2)
-    with a:
+
+def page_investigacion():
+    heading("01 · El proyecto", "¿Cómo se enseñan las energías renovables?",
+            "La investigación compara lo que prescriben los documentos, lo que declaran los docentes y el conocimiento físico del potencial energético local.")
+    tabs = st.tabs(["Pregunta y objetivos", "Marco teórico", "Antecedentes", "Hipótesis", "Método"])
+    with tabs[0]:
+        st.markdown("### Pregunta de investigación")
+        callout("¿Cómo se enseñan las energías renovables en los documentos curriculares y en las prácticas docentes de los cuatro niveles, y qué brechas hay frente al conocimiento físico del potencial energético local?")
+        st.caption("Inicial · Primario · Secundario · Superior/universitario, con Cruz del Eje como caso de anclaje.")
+        st.write("")
         st.markdown("#### Objetivo general")
         st.write("Analizar cómo se enseñan las energías renovables en los documentos y en las percepciones docentes de los cuatro niveles, identificar brechas frente al conocimiento físico local y elaborar propuestas de transposición didáctica.")
-    with b:
         st.markdown("#### Objetivos específicos")
-        st.markdown("1. Analizar presencia, profundidad y continuidad en los documentos.\n2. Relevar concepciones, apoyos y dificultades docentes.\n3. Evaluar la presencia del contexto energético local.\n4. Analizar la coherencia vertical entre niveles.\n5. Diseñar propuestas por nivel.")
-    st.divider()
-    st.markdown("### Marco conceptual: tres saberes")
-    cols=st.columns(3)
-    for c,n,t,d in zip(cols,["01","02","03"],["Saber sabio","Saber a enseñar","Saber enseñado"],["Visita técnica a la central Ferroviario y pliego de EPEC.","Progresiones de Ciencias Naturales y Tecnología, y plan de la Licenciatura en HST.","Entrevistas a seis docentes de los cuatro niveles."]):
-        with c: st.markdown(f'<div class="card"><div class="kicker">{n}</div><h3>{t}</h3><p>{d}</p></div>',unsafe_allow_html=True)
-    st.markdown("También completan el marco la alfabetización científica y el enfoque CTSA, el aprendizaje situado y la articulación curricular vertical.")
-    st.markdown("### Método")
-    st.markdown("- **Documentos:** progresiones de Ciencias Naturales, Educación Tecnológica y Computación, y plan de la Licenciatura en HST.\n- **Entrevistas:** seis docentes; entrevistas semiestructuradas de 15 a 20 minutos, anónimas.\n- **Visitas:** central Ferroviario, con entrevista a un técnico, e IPEA N.° 211, con entrevista a un docente.\n\n<small>Investigación cualitativa exploratoria, con muestra por conveniencia.</small>",unsafe_allow_html=True)
+        objs = ["Analizar presencia, profundidad y continuidad en los documentos.", "Relevar concepciones, apoyos y dificultades de los docentes.",
+                "Evaluar la presencia del contexto energético local.", "Analizar la coherencia vertical entre niveles.",
+                "Diseñar propuestas de transposición didáctica por nivel."]
+        cards([f'<div class="card"><div class="big-number" style="font-size:1.6rem">{i+1}</div><p>{o}</p></div>' for i, o in enumerate(objs)], cols=5)
+    with tabs[1]:
+        st.markdown("### Los tres saberes de Chevallard como estructura")
+        cards([card_html("Saber sabio", "Visita técnica", "Visita a la central «Ferroviario» y pliego de EPEC."),
+               card_html("Saber a enseñar", "Documentos curriculares", "Progresiones de Aprendizaje de Ciencias Naturales y Tecnología, y plan de la Licenciatura en HST."),
+               card_html("Saber enseñado", "Prácticas docentes", "Entrevistas a seis docentes de los cuatro niveles.")])
+        fig = find_asset("figura_saberes")
+        if fig:
+            st.image(str(fig), caption="Figura 1. Los tres saberes y los instrumentos con los que se los estudió.", **STRETCH)
+        st.markdown("### Tres ejes completan el marco")
+        cards([card_html("Eje 1", "Alfabetización científica y enfoque CTSA", "Enseñar energía con sus implicancias sociales, tecnológicas y ambientales."),
+               card_html("Eje 2", "Enseñanza contextualizada y aprendizaje situado", "El contenido cobra sentido cuando parte del entorno cercano de los estudiantes."),
+               card_html("Eje 3", "Articulación curricular vertical", "Progresión entre niveles, sin rupturas ni repeticiones sin articular.")])
+    with tabs[2]:
+        st.markdown("### Lo que ningún antecedente combina")
+        items = ["Energía y energías renovables como contenido escolar", "Comparación de tres o más niveles educativos",
+                 "Un caso energético local real, visitado y documentado", "El esquema de los tres saberes de Chevallard", "Articulación vertical entre niveles"]
+        cards([f'<div class="card"><div class="big-number" style="font-size:1.6rem">{i+1}</div><p>{t}</p></div>' for i, t in enumerate(items)], cols=5)
+        st.caption("De diez antecedentes (2018 a 2024) predominan las propuestas genéricas; escasean las ancladas en un caso local.")
+    with tabs[3]:
+        st.markdown("### Cuatro hipótesis específicas")
+        cards([card_html("H1", "Profundidad y continuidad", "Las renovables aparecen de forma esporádica y poco profunda, sin progresión clara entre años."),
+               card_html("H2", "Apoyos y demandas", "Los docentes se apoyan en contenidos generales y piden recursos y capacitación."),
+               card_html("H3", "Contexto local", "El dique y el parque solar están casi ausentes de documentos y prácticas."),
+               card_html("H4", "Articulación vertical", "Se repiten contenidos básicos sin profundización progresiva entre niveles.")], cols=2)
+        st.button("Ver cómo se contrastaron →", key="to_res", on_click=go_to, args=("Resultados y conclusiones",))
+    with tabs[4]:
+        st.markdown("### Diseño: documentos, entrevistas y visitas")
+        cards([card_html("Documentos", "Análisis documental", "Progresiones de Ciencias Naturales, Educación Tecnológica y Computación, y plan de la Lic. en HST. Matriz de cinco categorías."),
+               card_html("Entrevistas", "Seis docentes", "Uno de inicial, uno de primario, tres de secundario y uno de superior. Semiestructuradas, de 15 a 20 minutos, anónimas y con código por docente."),
+               card_html("Visitas", "Central e IPEA", "Central «Ferroviario», con entrevista a un técnico, e IPEA N.° 211, con entrevista a un docente.")])
+        st.caption("Investigación cualitativa exploratoria, con muestra por conveniencia.")
 
-elif page == "Mapa energético local":
-    heading("02 · Territorio", "Mapa energético local", "Un mapa de referencia para conectar la investigación con los lugares que la hacen concreta.")
-    import pandas as pd
+
+def page_documentos():
+    heading("02 · Evidencias", "Lo prescripto y lo enseñado", "Qué dicen los documentos y qué cuentan los docentes sobre la energía en cada nivel.")
+    tabs = st.tabs(["Currículo", "Docentes", "Prescripto vs. enseñado"])
+    with tabs[0]:
+        st.markdown("### Qué dicen los documentos")
+        st.markdown(table_html(["Categoría", "Hallazgo principal"], [
+            ["<b>Presencia</b>", "Explícita desde 6.° grado y en el Ciclo Orientado; ausente en Inicial y casi ausente en el plan universitario."],
+            ["<b>Profundidad</b>", "Crece con el nivel: se nombra, luego se cuantifica y se contextualiza."],
+            ["<b>Enfoque</b>", "CTS en primaria y secundaria; seguridad e higiene laboral en el plan universitario."],
+            ["<b>Contexto local</b>", "Ningún documento lo menciona de forma explícita."],
+            ["<b>Articulación vertical</b>", "Progresión identificable pero fragmentada; sin vínculo entre Física y Tecnología."]], widths=[24, 76]), unsafe_allow_html=True)
+        st.write("")
+        st.markdown("### Dónde aparece la energía en el currículo")
+        st.markdown(table_html(["Nivel", "Ciencias Naturales y Física", "Tecnología"], [
+            ["<b>Inicial</b>", "Ausente; eje precursor sobre transformaciones", "Ausente"],
+            ["<b>Primaria 6.°</b>", "Modos de generar energía eléctrica", "Tipos de energía y clasificación de fuentes"],
+            ["<b>Secundaria 1.°</b>", "Problematización del uso de fuentes", "Energía como insumo o salida"],
+            ["<b>Secundaria 2.°</b>", "—", "Lo más desarrollado: centrales hidroeléctricas y eólicas"],
+            ["<b>Secundaria 5.°</b>", "Inducción en dínamos y generadores", "—"]], widths=[20, 40, 40]), unsafe_allow_html=True)
+        st.write("")
+        st.markdown("### En la Licenciatura en HST la energía casi no aparece")
+        cards([card_html("1.° año · Física", "Hidrostática e Hidrodinámica", "La base de «Ferroviario», sin mención de energía ni de generación."),
+               card_html("3.° año", "Inducción y balances", "Inducción de Faraday y Lenz sin aplicarla a la generación; balances de energía en sentido industrial."),
+               card_html("4.° año y plan completo", "Sostenibilidad general", "Ningún espacio nombra Cruz del Eje ni el dique.")])
+        callout("<b>Hallazgo transversal.</b> Ciencias Naturales y Tecnología clasifican las fuentes en el mismo grado, 6.° de primaria, pero desde ángulos distintos y sin coordinación visible.")
+    with tabs[1]:
+        st.markdown("### Voces docentes por nivel")
+        lv = st.tabs(["Inicial y primario", "Secundario", "Superior"])
+        with lv[0]:
+            cards([card_html("Inicial", "Explorar antes de nombrar",
+                             "Anticipar y comprobar con objetos cotidianos.<br><b>Contexto:</b> escuela rural y parques solares.<br><b>Dificultad:</b> concepciones previas y tiempo.<br><b>Pide:</b> materiales sencillos, recursos visuales y capacitación."),
+                   card_html("Primario · 1.° grado", "Sol, agua y viento",
+                             "Experimentos simples.<br><b>Contexto:</b> el dique y fotos auténticas del paisaje, sin visitas.<br><b>Dificultad:</b> abstracción y falta de kits.<br><b>Pide:</b> kits itinerantes con maquetas, guías regionales y talleres.")])
+            st.caption("En ambos niveles lo enseñado excede o se adelanta a lo prescripto.")
+        with lv[1]:
+            cards([card_html("D-SEC · técnica, 6.° año", "Contenido central y cuantitativo", "Enfoque CTS. Sin visitas ni datos locales; quiere visitar.<br><b>Dificultad:</b> el tiempo."),
+                   card_html("D-SEC2 · Física, 1.° y 5.°", "Teoría con énfasis ambiental", "Salida al dique y a la planta potabilizadora. Única docente de Física: sostiene la continuidad."),
+                   card_html("D-SEC3 · técnica, 5.° y 6.°", "Eje propio en 6.°", "Solar con equipo real; visitas a la central y moto eléctrica en la feria.<br><b>Falta:</b> material para eólica y mareomotriz.")])
+            st.caption("El contenido es sistemático; la brecha está en el anclaje local y en los recursos de modelización.")
+        with lv[2]:
+            cards([card_html("Lo que declara D-UNI", "Fuentes por separado",
+                             "Trabaja energía solar, eólica, hidráulica y biomasa. Se apoya en imágenes, videos y simuladores. Menciona el dique y los parques solares, sin profundizar ni visitar. Los estudiantes llegan con conocimientos previos dispares. <b>Pide:</b> equipos didácticos, simuladores y visitas."),
+                   card_html("Brecha", "Doble", "Experimental, por falta de equipos y mediciones directas, y de anclaje local.")])
+        st.markdown("### Saber enseñado, nivel por nivel")
+        st.markdown(table_html(["Nivel", "Energía en el aula", "Qué demandan"], [
+            ["<b>Inicial</b>", "Idea emergente de los fenómenos; excede lo prescripto", "Materiales sencillos, recursos visuales y locales"],
+            ["<b>Primario</b>", "Sol, agua y viento desde 1.° grado, antes que el currículo", "Kits itinerantes con maquetas y guías regionales"],
+            ["<b>Secundario</b>", "Contenido sistemático; contexto local en dos de tres docentes", "Planos de maquetas, salidas y capacitación"],
+            ["<b>Superior</b>", "Fuentes por separado, teórico y con simuladores", "Equipos didácticos, simuladores y visitas"]], widths=[16, 44, 40]), unsafe_allow_html=True)
+    with tabs[2]:
+        st.markdown("### Lo prescripto y lo enseñado no coinciden")
+        cards([metric_card("Documentos", "0", "mencionan de forma explícita el contexto local."),
+               metric_card("Docentes", "5 de 6", "usan o mencionan el contexto local en sus clases."),
+               metric_card("Demanda", "5 de 6", "piden recursos o capacitación didáctica.")])
+        callout("<b>La ausencia en el currículo no equivale a ausencia en el aula.</b>")
+
+
+def page_mapa():
+    heading("03 · Territorio", "Mapa energético local", "Un mapa de referencia para conectar la investigación con los lugares que la hacen concreta.")
     locations = pd.DataFrame([
-        {"Lugar":"Dique Cruz del Eje / Arturo Illia", "Latitud":-30.76194, "Longitud":-64.75248, "Tipo":"Agua y generación", "Detalle":"Embalse asociado al riego y a la generación hidroeléctrica."},
-        {"Lugar":"IPEA N.º 211 Presidente Arturo Illia", "Latitud":-30.74969, "Longitud":-64.73899, "Tipo":"Biomasa y educación", "Detalle":"Institución educativa vinculada al relevamiento sobre compostaje."},
-        {"Lugar":"Central hidroeléctrica El Ferroviario (EPEC)", "Latitud":-30.74950, "Longitud":-64.79675, "Tipo":"Generación hidroeléctrica", "Detalle":"Ubicación identificada mediante el código de mapa 7623+68."},
-        {"Lugar":"Parque Solar Fotovoltaico Cruz del Eje (expediente ambiental 2026)", "Latitud":-30.746833, "Longitud":-64.727333, "Tipo":"Energía solar fotovoltaica", "Detalle":"Coordenadas publicadas en el aviso de proyecto ambiental de 2026: Pedanía San Marcos, fuera del ejido urbano."},
+        {"Lugar": "Dique Cruz del Eje / Arturo Illia", "Latitud": -30.76194, "Longitud": -64.75248, "Tipo": "Agua y generación", "Detalle": "Embalse asociado al riego y a la generación hidroeléctrica."},
+        {"Lugar": "IPEA N.º 211 Presidente Arturo Illia", "Latitud": -30.74969, "Longitud": -64.73899, "Tipo": "Biomasa y educación", "Detalle": "Institución educativa vinculada al relevamiento sobre compostaje."},
+        {"Lugar": "Central hidroeléctrica El Ferroviario (EPEC)", "Latitud": -30.74950, "Longitud": -64.79675, "Tipo": "Generación hidroeléctrica", "Detalle": "Ubicación identificada mediante el código de mapa 7623+68."},
+        {"Lugar": "Parque Solar Fotovoltaico Cruz del Eje (expediente ambiental 2026)", "Latitud": -30.746833, "Longitud": -64.727333, "Tipo": "Energía solar fotovoltaica",
+         "Detalle": "Coordenadas publicadas en el aviso de proyecto ambiental de 2026: Pedanía San Marcos, fuera del ejido urbano."},
     ])
-    figmap = go.Figure()
-    figmap.add_trace(go.Scattermap(
+    fig = go.Figure()
+    fig.add_trace(go.Scattermap(
         lat=locations["Latitud"], lon=locations["Longitud"], mode="markers+text",
         text=["Dique Arturo Illia", "IPEA N.º 211", "Central El Ferroviario", "Parque solar · proyecto 2026"], textposition="top right",
-        marker=dict(size=[18,15,17,16], color=["#167d72", "#d6a73b", "#2864b4", "#e1a52e"]),
+        textfont=dict(size=13, color="#111111" if not T["dark"] else "#ffffff"),
+        marker=dict(size=[19, 16, 18, 17], color=[T["c1"], T["c2"], T["c3"], "#E1A52E"]),
         customdata=locations[["Tipo", "Detalle"]].values,
-        hovertemplate="<b>%{text}</b><br>%{customdata[0]}<br>%{customdata[1]}<extra></extra>"
-    ))
-    figmap.update_layout(map=dict(style="open-street-map", center=dict(lat=-30.753, lon=-64.763), zoom=10.5),
-                         height=510, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor="rgba(0,0,0,0)",
-                         legend=dict(orientation="h"))
-    st.plotly_chart(figmap, use_container_width=True)
-    a,b=st.columns(2)
+        hovertemplate="<b>%{text}</b><br>%{customdata[0]}<br>%{customdata[1]}<extra></extra>"))
+    fig.update_layout(map=dict(style=T["mapStyle"], center=dict(lat=-30.753, lon=-64.763), zoom=10.5), height=520, margin=dict(l=0, r=0, t=0, b=0),
+                      paper_bgcolor="rgba(0,0,0,0)", showlegend=False)
+    plot(fig)
+    a, b = st.columns(2, gap="large")
     with a:
-        st.markdown('<div class="card"><div class="kicker">Agua</div><h3>Dique Arturo Illia</h3><p>Un sistema donde el agua cumple funciones de regulación, riego y generación. Es el punto de partida para conversar sobre altura, caudal y potencia.</p><a href="https://www.diquesdecordoba.com.ar/dique-cruz-del-eje/" target="_blank">Consultar ficha del dique ↗</a></div>', unsafe_allow_html=True)
+        photo(["dique_cruz_del_eje", "dique"], "Dique Arturo Illia (Cruz del Eje)", "Foto del dique", height=240)
+        st.markdown(card_html("Agua", "Dique Arturo Illia", "Un sistema donde el agua cumple funciones de regulación, riego y generación. Es el punto de partida para conversar sobre altura, caudal y potencia.",
+                              '<a href="https://www.diquesdecordoba.com.ar/dique-cruz-del-eje/" target="_blank">Consultar ficha del dique ↗</a>'), unsafe_allow_html=True)
     with b:
-        st.markdown('<div class="card"><div class="kicker">Biomasa</div><h3>IPEA N.º 211</h3><p>La investigación incorpora las prácticas de compostaje como oportunidad para estudiar procesos exotérmicos y recuperación de calor.</p><a href="https://mapa.educacion.gob.ar/legajo/140256100" target="_blank">Consultar ficha educativa ↗</a></div>', unsafe_allow_html=True)
+        photo(["ipea_211", "ipea"], "IPEA N.º 211 «Presidente Arturo Illia»", "Foto del IPEA N.º 211", height=240)
+        st.markdown(card_html("Biomasa", "IPEA N.º 211", "La investigación incorpora las prácticas de compostaje como oportunidad para estudiar procesos exotérmicos y recuperación de calor.",
+                              '<a href="https://mapa.educacion.gob.ar/legajo/140256100" target="_blank">Consultar ficha educativa ↗</a>'), unsafe_allow_html=True)
     st.markdown("### Central hidroeléctrica El Ferroviario")
     st.write("El punto de El Ferroviario corresponde al código de ubicación 7623+68. Para el parque solar se prioriza la ubicación informada en el aviso de proyecto ambiental de 2026: Pedanía San Marcos, fuera del ejido urbano de Cruz del Eje.")
-    st.link_button("Abrir El Ferroviario en Google Maps", "https://www.google.com/maps/search/?api=1&query=7623%2B68%20Cruz%20del%20Eje%2C%20C%C3%B3rdoba")
-    st.link_button("Consultar aviso ambiental 2026 del parque solar", "https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/")
-    st.link_button("Consultar antecedente técnico de EPEC (2022)", "https://www.epec.com.ar/docs/imagenes/comunidad/blog/88/ANEXO3_PROYECTOS_PROPUESTOS_POR_EPEC_Convocatoria2022.pdf")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.link_button("Abrir El Ferroviario en Google Maps", "https://www.google.com/maps/search/?api=1&query=7623%2B68%20Cruz%20del%20Eje%2C%20C%C3%B3rdoba", **STRETCH)
+    with c2:
+        st.link_button("Aviso ambiental 2026 del parque solar", "https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/", **STRETCH)
+    with c3:
+        st.link_button("Antecedente técnico de EPEC (2022)", "https://www.epec.com.ar/docs/imagenes/comunidad/blog/88/ANEXO3_PROYECTOS_PROPUESTOS_POR_EPEC_Convocatoria2022.pdf", **STRETCH)
     st.caption("Hay una diferencia entre la ubicación consignada en el documento de EPEC de 2022 (frente a la central hidroeléctrica) y la ubicación del expediente ambiental difundido en 2026. El mapa muestra la ubicación más reciente publicada y conserva el antecedente como fuente de contexto.")
 
-elif page == "Registro de campo":
-    heading("02 · Evidencias del territorio", "Registro de campo", "Fotografías aportadas para documentar la visita a la central hidroeléctrica y al IPEA N.º 211.")
-    st.markdown("### Central hidroeléctrica Ferroviario")
-    st.write("Equipamiento, turbinas, instrumentos y sectores de la instalación registrados durante el relevamiento.")
-    central_cols = st.columns(3)
-    for idx, col in zip(range(1, 11), central_cols * 4):
-        with col:
-            st.image(f"assets/relevamiento_{idx:02d}.jpg", use_container_width=True, caption=f"Registro de campo · imagen {idx}")
-    st.divider()
-    st.markdown("### IPEA N.º 211 y espacios de compostaje")
-    st.write("Espacios de la institución educativa, invernadero y pilas de material orgánico incluidos en el registro fotográfico.")
-    school_cols = st.columns(3)
-    for idx, col in zip(range(11, 21), school_cols * 4):
-        with col:
-            st.image(f"assets/relevamiento_{idx:02d}.jpg", use_container_width=True, caption=f"Registro de campo · imagen {idx}")
-    st.divider()
-    st.markdown("### Video de la visita")
-    st.caption("Registro audiovisual de la visita técnica.")
-    st.video("assets/registro_visita.mp4")
 
-elif page == "Cruz del Eje":
-    heading("02 · Anclaje territorial", "Un caso energético real", "El contexto local permite conectar conceptos físicos, infraestructura y decisiones ambientales con lugares cercanos a la comunidad educativa.")
-    st.markdown("El caso local permite analizar distintas formas de aprovechamiento energético y discutir su relación con la educación ambiental.")
-    cols=st.columns(3)
-    with cols[0]:
-        st.markdown('<div class="card"><div class="kicker">Agua</div><h3>Dique Arturo Illia</h3><p>Recurso vinculado al riego y a la generación hidroeléctrica.</p></div>',unsafe_allow_html=True)
-    with cols[1]:
-        st.markdown('<div class="card"><div class="kicker">Electricidad</div><h3>Central Ferroviario</h3><p>Caída neta relevada de 28 m y potencia informada de 0,5 MW. Elevación de tensión de 380 V a 13.200 V.</p></div>',unsafe_allow_html=True)
-    with cols[2]:
-        st.markdown('<div class="card"><div class="kicker">Sol</div><h3>Parque solar fotovoltaico</h3><p>El aviso ambiental difundido en 2026 ubica el proyecto en Pedanía San Marcos, fuera del ejido urbano de Cruz del Eje. La documentación de EPEC de 2022 consignaba un emplazamiento distinto.</p><a href="https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/" target="_blank">Consultar aviso ambiental 2026 ↗</a></div>',unsafe_allow_html=True)
+def page_cruz():
+    heading("04 · Anclaje territorial", "Un caso energético real", "El contexto local permite conectar conceptos físicos, infraestructura y decisiones ambientales con lugares cercanos a la comunidad educativa.")
+    a, b = st.columns(2, gap="large")
+    with a:
+        photo(["ingreso_cruz_del_eje", "ingreso"], "Ingreso a la ciudad de Cruz del Eje", "Foto del ingreso a Cruz del Eje", height=300)
+    with b:
+        photo(["dique_cruz_del_eje", "dique"], "Dique Arturo Illia", "Foto del dique", height=300)
     st.write("")
+    cards([card_html("Agua", "Dique Arturo Illia", "Recurso vinculado al riego y a la generación hidroeléctrica."),
+           card_html("Electricidad", "Central Ferroviario", "Caída neta relevada de 28 m y potencia informada de 0,5 MW. Elevación de tensión de 380 V a 13.200 V."),
+           card_html("Sol", "Parque solar fotovoltaico",
+                     "El aviso ambiental difundido en 2026 ubica el proyecto en Pedanía San Marcos, fuera del ejido urbano de Cruz del Eje. La documentación de EPEC de 2022 consignaba un emplazamiento distinto.",
+                     '<a href="https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/" target="_blank">Consultar aviso ambiental 2026 ↗</a>')])
+    st.markdown("### De la toma de agua a la red: la central «Ferroviario»")
+    st.markdown("""<div class="flow">
+<div class="step"><b>Toma de agua</b><span>El agua del dique entra al sistema.</span><em>Energía potencial</em></div>
+<div class="step"><b>Tubería de presión</b><span>Caída neta de 28 m.</span><em>Presión y velocidad</em></div>
+<div class="step"><b>Turbina</b><span>El agua empuja el rodete.</span><em>Energía mecánica</em></div>
+<div class="step"><b>Generador</b><span>0,5 MW a 380 V.</span><em>Inducción de Faraday</em></div>
+<div class="step"><b>Transformador</b><span>380 V → 13.200 V, hacia la red de EPEC.</span><em>Menos pérdidas por efecto Joule</em></div></div>""", unsafe_allow_html=True)
+    st.write("")
+    st.button("Probar la turbina en el laboratorio 3D →", key="to_lab", on_click=go_to, args=("Laboratorio hidráulico 3D",))
     st.markdown("### ¿Por qué importa el contexto local?")
     st.write("En el análisis documental, ningún documento menciona explícitamente Cruz del Eje, el dique o EPEC. Sin embargo, cinco de los seis docentes entrevistados usan o mencionan el contexto local. Esto muestra una distancia entre lo prescripto y lo enseñado.")
     st.markdown("### Marco normativo citado en el trabajo")
@@ -252,206 +538,308 @@ elif page == "Cruz del Eje":
     ]
     for law_title, law_url, law_desc in laws:
         st.markdown(f'<div class="card" style="margin-bottom:.65rem;padding:1rem 1.15rem"><a href="{law_url}" target="_blank">{law_title} ↗</a><p style="margin:.35rem 0 0">{law_desc}</p></div>', unsafe_allow_html=True)
+    fig = find_asset("figura_normativa")
+    if fig:
+        st.image(str(fig), caption="Figura 2. Cadena normativa que respalda el proyecto.", **STRETCH)
 
-elif page == "Laboratorio hidráulico 3D":
-    heading("04 · Simulación interactiva", "Laboratorio hidráulico", "Modificá las variables del modelo para explorar cómo se relacionan la altura de caída, el caudal y la potencia hidráulica.")
-    st.markdown('<div class="callout"><b>Modelo idealizado</b><br>La potencia hidráulica disponible se estima con P = ρ · g · Q · H. La potencia eléctrica depende además de la eficiencia del sistema. Los controles permiten explorar escenarios; no son mediciones de la central.</div>',unsafe_allow_html=True)
-    c1,c2=st.columns([1,1.35])
-    with c1:
-        st.markdown("#### Variables del modelo")
-        h=st.slider("Altura neta H (m)",1.0,40.0,28.0,0.5)
-        q=st.slider("Caudal Q (m³/s)",0.1,4.0,2.3,0.1)
-        eff=st.slider("Eficiencia global (%)",20,95,80,1)
-        rho=1000; g=9.81
-        p_h=rho*g*q*h/1e6
-        p_e=p_h*eff/100
-        st.metric("Potencia hidráulica estimada",f"{p_h:.3f} MW")
-        st.metric("Potencia eléctrica estimada",f"{p_e:.3f} MW",help="Potencia hidráulica multiplicada por la eficiencia supuesta.")
-        st.caption("El valor de eficiencia es un supuesto modificable para fines didácticos.")
-    with c2:
-        st.markdown("#### Modelo 3D de una turbina hidráulica")
-        st.caption("Esquema didáctico de los componentes principales; no es un plano constructivo de la central Ferroviario.")
-        # Modelo volumétrico conceptual de turbina Francis horizontal, con carcasa en corte.
-        # La geometría ilustra el recorrido del agua; no representa dimensiones constructivas reales.
-        fig = go.Figure()
-        ang = np.linspace(-0.35, 5.15, 110)  # abertura frontal para ver el interior
-        cross = np.linspace(0, 2*np.pi, 28)
-        A, T = np.meshgrid(ang, cross)
-        # Voluta metálica en corte: tubo curvo de sección variable alrededor del rodete.
-        major = 0.88 + 0.08*np.sin(A)
-        minor = 0.22 + 0.07*(A-ang.min())/(ang.max()-ang.min())
-        Xv = (major + minor*np.cos(T))*np.cos(A)
-        Yv = (major + minor*np.cos(T))*np.sin(A)
-        Zv = 0.49 + minor*np.sin(T)
-        fig.add_trace(go.Surface(x=Xv, y=Yv, z=Zv, surfacecolor=np.broadcast_to(minor, Xv.shape),
-            colorscale=[[0,"#718792"],[0.45,"#c6d2d6"],[1,"#526b77"]],
-            opacity=.66, showscale=False, name="Carcasa espiral (corte)",
-            hovertemplate="Carcasa espiral: distribuye el agua alrededor del rodete<extra></extra>"))
-        # Bridas y tuberías de entrada/salida, representadas como tubos con líneas gruesas.
-        fig.add_trace(go.Scatter3d(x=[-2.75,-2.25,-1.75,-1.18], y=[1.28,1.22,0.98,0.63], z=[0.50,0.50,0.50,0.50],
-            mode="lines", line=dict(color="#1a91c8", width=28), name="Entrada de agua",
-            hovertemplate="Entrada de agua a presión<extra></extra>"))
-        fig.add_trace(go.Scatter3d(x=[1.05,1.55,2.05,2.55], y=[0,0,0,0], z=[0.18,0.18,0.18,0.18],
-            mode="lines", line=dict(color="#238fc0", width=24), name="Salida / tubo de aspiración",
-            hovertemplate="Salida del agua hacia el canal de restitución<extra></extra>"))
-        # Bridas metálicas visibles en los extremos de las tuberías.
-        for x0, y0, z0 in [(-2.15,1.22,.50),(1.52,0,.18)]:
-            phi = np.linspace(0,2*np.pi,50)
-            fig.add_trace(go.Scatter3d(x=np.full_like(phi,x0), y=y0+.20*np.cos(phi), z=z0+.20*np.sin(phi),
-                mode="lines", line=dict(color="#d8e0e3",width=5), showlegend=False, hoverinfo="skip"))
-        # Anillo guía / distribuidor alrededor del rodete.
-        phi=np.linspace(0,2*np.pi,100)
-        for z0, rad in [(0.40,.82),(0.62,.82)]:
-            fig.add_trace(go.Scatter3d(x=rad*np.cos(phi), y=rad*np.sin(phi), z=np.full_like(phi,z0),
-                mode="lines", line=dict(color="#c0a36d",width=9), name="Distribuidor" if z0==.40 else None,
-                showlegend=(z0==.40), hovertemplate="Distribuidor: orienta el flujo hacia los álabes<extra></extra>"))
-        # Rodete, eje horizontal y palas curvadas.
-        fig.add_trace(go.Scatter3d(x=[-0.12,0.12], y=[0,0], z=[0.51,0.51], mode="lines",
-            line=dict(color="#b77a29",width=18), name="Cubo del rodete", hovertemplate="Cubo del rodete<extra></extra>"))
-        for a0 in np.linspace(0,2*np.pi,10,endpoint=False):
-            radii=np.linspace(.16,.73,14)
-            curve=a0 + 0.30*(radii-.16)/(.73-.16)
-            fig.add_trace(go.Scatter3d(x=radii*np.cos(curve), y=radii*np.sin(curve),
-                z=.51+0.06*np.sin(np.linspace(0,np.pi,14)), mode="lines",
-                line=dict(color="#e7b44f",width=10), showlegend=False,
-                hovertemplate="Álabe curvado del rodete<extra></extra>"))
-        # Eje de transmisión hacia el generador, colocado a la izquierda del rodete.
-        fig.add_trace(go.Scatter3d(x=[-0.10,-0.55,-0.85,-1.08], y=[0,0,0,0], z=[0.51,0.51,0.51,0.51],
-            mode="lines", line=dict(color="#d0d6da",width=13), name="Eje de transmisión",
-            hovertemplate="El eje transmite el giro al generador<extra></extra>"))
-        # Generador cilíndrico horizontal: malla lateral y tapas.
-        gx=np.linspace(-1.95,-1.05,28); gp=np.linspace(0,2*np.pi,60)
-        GX, GP = np.meshgrid(gx, gp)
-        GY=.40*np.cos(GP); GZ=.51+.40*np.sin(GP)
-        fig.add_trace(go.Surface(x=GX,y=GY,z=GZ,colorscale=[[0,"#425966"],[.5,"#8fa0a9"],[1,"#d0d8dc"]],
-            showscale=False,opacity=.98,name="Generador eléctrico",hovertemplate="Generador: convierte energía mecánica en eléctrica<extra></extra>"))
-        for x0 in [-1.95,-1.05]:
-            fig.add_trace(go.Scatter3d(x=np.full_like(gp,x0),y=.40*np.cos(gp),z=.51+.40*np.sin(gp),
-                mode="lines",line=dict(color="#344955",width=7),showlegend=False,hoverinfo="skip"))
-        # Etiquetas espaciales para lectura inmediata.
-        labels=[(-2.25,.40,1.02,"GENERADOR"),(-1.15,.05,.95,"EJE"),(.05,.90,1.03,"RODETE"),(.95,-.15,.90,"CARCASA / DISTRIBUIDOR"),(-2.65,1.42,.88,"ENTRADA"),(2.00,.25,.52,"SALIDA")]
-        for lx,ly,lz,txt in labels:
-            fig.add_trace(go.Scatter3d(x=[lx],y=[ly],z=[lz],mode="text",text=[txt],
-                textfont=dict(size=10,color="#18343a"),showlegend=False,hoverinfo="skip"))
-        fig.update_layout(height=560, margin=dict(l=0,r=0,t=8,b=10), paper_bgcolor="rgba(0,0,0,0)",
-            scene=dict(xaxis=dict(visible=False,range=[-3.1,2.9]),yaxis=dict(visible=False,range=[-1.65,1.65]),
-            zaxis=dict(visible=False,range=[-0.1,1.35]),aspectmode="manual",aspectratio=dict(x=1.8,y=1.05,z=.85),
-            camera=dict(eye=dict(x=1.65,y=1.8,z=1.25))),
-            legend=dict(orientation="h",y=-.04,font=dict(color="#142b2b",size=10)),font=dict(color="#142b2b"))
-        st.plotly_chart(fig, use_container_width=True)
-        with st.expander("Ver esquema de referencia de una turbina hidráulica"):
-            st.image("assets/turbina_referencia_componentes.png", use_container_width=True, caption="Esquema de referencia aportado para identificar entrada de agua, distribuidor, rodete, eje, generador y salida.")
-            st.caption("Esquema de referencia de los componentes principales de una turbina hidráulica.")
-        st.markdown("**Partes identificables**")
-        pcols = st.columns(3)
-        for col, name, desc in zip(pcols, ["Entrada / distribuidor", "Rodete y eje", "Generador / salida"], ["El agua llega guiada hacia la turbina.", "El flujo transfiere energía al conjunto móvil.", "El eje acciona el generador; el agua continúa hacia la salida."]):
-            with col:
-                st.markdown(f'<div class="card"><h3 style="font-size:1rem">{name}</h3><p style="font-size:.88rem">{desc}</p></div>', unsafe_allow_html=True)
-    st.markdown("#### Explorá el resultado")
-    xs=np.linspace(.1,4,50)
-    ys=rho*g*xs*h*eff/100/1e6
-    f2=go.Figure(go.Scatter(x=xs,y=ys,mode="lines",line=dict(width=3,color="#16836a"),name="Potencia eléctrica estimada"))
-    f2.add_trace(go.Scatter(x=[q],y=[p_e],mode="markers",marker=dict(size=12,color="#f1bd4b"),name="Escenario actual"))
-    f2.update_layout(height=300,margin=dict(l=10,r=10,t=20,b=10),xaxis_title="Caudal Q (m³/s)",yaxis_title="Potencia (MW)",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="white")
-    st.plotly_chart(f2,use_container_width=True)
-    st.info("La potencia estimada aumenta en proporción directa al caudal cuando la altura y la eficiencia permanecen constantes.")
 
-elif page == "Compostaje y calor":
-    heading("04 · Biomasa y energía térmica", "Compostaje y calor", "Explorá las fases de un proceso biológico y diferenciá el calor transferido al agua de la energía realmente recuperable.")
-    st.markdown("La investigación describe que en la escuela se mide la temperatura de las pilas, pero no se registra directamente el calor liberado. Esta calculadora es un ejercicio didáctico: estima el calor necesario para elevar la temperatura de una masa de agua.")
-    c1,c2=st.columns([1,1])
-    with c1:
-        mass=st.number_input("Masa de agua (kg)",min_value=1.0,max_value=10000.0,value=100.0,step=10.0)
-        t0=st.slider("Temperatura inicial (°C)",0,40,20)
-        t1=st.slider("Temperatura final (°C)",20,90,40)
-        days=st.slider("Días de suministro",1,30,18)
-        cp=4186
-        delta=max(0,t1-t0)
-        heat=mass*cp*delta
-        kwh=heat/3.6e6
-        st.metric("Calor transferido al agua",f"{heat:,.0f} J")
-        st.metric("Equivalencia energética",f"{kwh:.2f} kWh")
-    with c2:
-        st.markdown('<div class="card"><div class="kicker">Modelo físico</div><h3>Q = m · c · ΔT</h3><p><b>m</b>: masa de agua (kg)<br><b>c</b>: calor específico del agua (aprox. 4186 J/kg·°C)<br><b>ΔT</b>: variación de temperatura</p><hr><div class="kicker">Escenario elegido</div><div class="big-number">{:.1f} °C</div><p>Incremento de temperatura del agua durante el cálculo.</p><p class="small-muted">La calculadora no predice el calor real disponible en una pila de compost. Para eso se necesitan mediciones y un modelo de pérdidas, duración y recuperación térmica.</p></div>'.format(delta),unsafe_allow_html=True)
+def page_registro():
+    heading("05 · Evidencias del territorio", "Registro de campo", "Fotografías aportadas para documentar la visita a la central hidroeléctrica y al IPEA N.º 211.")
+    tabs = st.tabs(["Central Ferroviario", "IPEA N.º 211", "Video de la visita"])
+
+    def gallery(rng, intro):
+        st.write(intro)
+        files = [(i, ASSETS / f"relevamiento_{i:02d}.jpg") for i in rng]
+        files = [(i, p) for i, p in files if p.exists()]
+        if not files:
+            st.info("Todavía no hay fotos en la carpeta assets (relevamiento_XX.jpg).")
+            return
+        cols = st.columns(3)
+        for n, (i, p) in enumerate(files):
+            with cols[n % 3]:
+                st.image(str(p), caption=f"Registro de campo · imagen {i}", **STRETCH)
+
+    with tabs[0]:
+        gallery(range(1, 11), "Equipamiento, turbinas, instrumentos y sectores de la instalación registrados durante el relevamiento.")
+    with tabs[1]:
+        gallery(range(11, 21), "Espacios de la institución educativa, invernadero y pilas de material orgánico incluidos en el registro fotográfico.")
+    with tabs[2]:
+        st.caption("Registro audiovisual de la visita técnica.")
+        v = ASSETS / "registro_visita.mp4"
+        if v.exists():
+            st.video(str(v))
+        else:
+            st.info("El video todavía no está en la carpeta assets (registro_visita.mp4).")
+
+
+@st.cache_data(show_spinner=False)
+def _turbine_template():
+    return (BASE / "componentes" / "turbina3d.html").read_text(encoding="utf-8")
+
+
+def turbine_html():
+    cfg = dict(css=dict(bg=T["bg"], surface=T["surface"], ink=T["ink"], muted=T["muted"], primary=T["primary"], primaryInk=T["primaryInk"],
+                        border=T["border"], accent=T["accent"], warn=T["warn"]),
+               scene=dict(top=T["sceneTop"], bottom=T["sceneBottom"], grid=T["grid"]), defaults=dict(H=28, Q=2.3, eff=80))
+    return _turbine_template().replace("__CONFIG__", json.dumps(cfg))
+
+
+def page_laboratorio():
+    heading("06 · Simulación interactiva", "Laboratorio hidráulico",
+            "Mové las variables y mirá cómo cambian el distribuidor, el recorrido del agua y la potencia. Arrastrá el modelo para girarlo y usá la rueda para acercarte.")
+    callout("<b>Modelo idealizado.</b> La potencia hidráulica disponible se estima con P = ρ · g · Q · H. La potencia eléctrica depende además de la eficiencia del sistema. "
+            "Con H = 28 m, Q = 2,3 m³/s y 80 % el modelo da cerca de 0,5 MW, la potencia informada para «El Ferroviario»; el caudal y la eficiencia son supuestos, no mediciones de la central.")
     st.write("")
+    embed_html(turbine_html(), height=800)
+    st.write("")
+    st.markdown("### Qué mirar")
+    cards([card_html("1 · Potencia y caudal", "Proporcionales", "Con H y eficiencia fijas, al duplicar el caudal se duplica la potencia: la recta del gráfico lo muestra."),
+           card_html("2 · El distribuidor", "Regula el caudal", "Al subir Q, las palas directrices se abren. Cerradas, la máquina se detiene aunque haya altura."),
+           card_html("3 · Giro constante", "Sincronismo", "En una central conectada a la red el rodete gira siempre a la misma velocidad: cambia la potencia, no las vueltas."),
+           card_html("4 · Eficiencia", "Lo que no se aprovecha", "La barra naranja es potencia que se pierde por rozamiento, remolinos y calor en el generador.")], cols=4)
+    with st.expander("Preguntas para explorar con la simulación"):
+        st.markdown("1. ¿Qué pasa con la potencia si H pasa de 28 m a 14 m y el caudal no cambia? ¿Y si el caudal se reduce a la mitad?\n"
+                    "2. ¿Qué caudal haría falta para obtener 1 MW con H = 28 m y una eficiencia del 80 %?\n"
+                    "3. Si la eficiencia baja de 80 % a 60 %, ¿cuántos kWh se pierden cada hora?\n"
+                    "4. ¿Por qué conviene transformar la tensión de 380 V a 13.200 V para transportar la energía?")
+    st.caption("Modelo 3D realizado con three.js. Necesita conexión a internet y un navegador con WebGL.")
+
+
+# ── Compostaje ──
+_CURVE = np.array([[0, 20], [3, 38], [6, 52], [9, 60], [14, 62], [20, 58], [26, 50], [32, 42], [40, 32], [50, 26], [70, 22], [90, 20]], float)
+_DAYS = np.arange(0, 91)
+_RAW = np.interp(_DAYS, _CURVE[:, 0], _CURVE[:, 1])
+_PAD = np.pad(_RAW, 4, mode="edge")
+CURVE_T = np.convolve(_PAD, np.ones(7) / 7, mode="same")[4:-4]
+CURVE_T[0] = 20.0
+PEAK_DAY = int(np.argmax(CURVE_T))
+
+
+def phase_of(day, temp):
+    if day <= PEAK_DAY:
+        if temp < 40:
+            return 0
+        return 1 if temp < 55 else 2
+    if temp >= 55:
+        return 2
+    if temp >= 40:
+        return 1
+    return 3 if day < 50 else 4
+
+
+PHASES = [
+    ("Fase mesófila", "#3C8DBC", "Por debajo de 40 °C", "Los microorganismos consumen los materiales más fáciles de degradar y liberan calor: la pila empieza a entibiarse."),
+    ("Fase termófila", "#E0B02E", "Entre 40 y 55 °C", "Dominan los microorganismos que toleran el calor. Es la etapa de mayor actividad y de mayor descomposición."),
+    ("Higienización", "#E8833A", "Entre 55 y 65 °C", "Con estas temperaturas sostenidas se reducen patógenos y semillas de malezas. Hay que cuidar que no se seque la pila."),
+    ("Enfriamiento", "#5BA7A0", "La temperatura baja", "Se agota el material fácil de degradar, disminuye la actividad y la pila se enfría."),
+    ("Maduración", "#8A6D4B", "Cerca de la temperatura ambiente", "El material se estabiliza y se transforma en un abono maduro (humus)."),
+]
+
+
+def pile_figure(t_core, mass):
+    s = (mass / 1000) ** (1 / 3)
+    w, hp = 1.7 * s, 1.15 * s
+    xs, ys = np.linspace(-2.5, 2.5, 120), np.linspace(0, 1.9, 70)
+    X, Y = np.meshgrid(xs, ys)
+    rho = ((np.abs(X) / w) ** 2.6 + (Y / hp) ** 2.6) ** (1 / 2.6)
+    f = 0.06 + 0.94 * np.clip((1 - rho) / 0.5, 0, 1) ** 0.7
+    Z = np.where(rho <= 1, 20 + (t_core - 20) * f, np.nan)
+    colors = [[0, "#2B6CB0"], [0.2, "#38B2AC"], [0.4, "#9AD36A"], [0.55, "#ECC94B"], [0.75, "#ED8936"], [1, "#E53E3E"]]
+    fig = go.Figure(go.Heatmap(x=xs, y=ys, z=Z, zmin=15, zmax=70, colorscale=colors, zsmooth="best", hovertemplate="%{z:.0f} °C<extra></extra>",
+                               colorbar=dict(title=dict(text="°C", font=dict(color=T["ink"])), thickness=12, len=0.85, tickfont=dict(color=T["ink"]))))
+    fig.add_shape(type="rect", x0=-2.5, x1=2.5, y0=-0.25, y1=0, fillcolor="#6B4F36", line=dict(width=0), layer="below")
+    fig.add_annotation(x=0, y=hp * 0.5, text=f"<b>Núcleo: {t_core:.0f} °C</b>", showarrow=False, font=dict(color="#ffffff", size=15), bgcolor="rgba(0,0,0,.38)", borderpad=4)
+    fig.add_annotation(x=-2.45, y=1.8, text="Aire: 20 °C", showarrow=False, xanchor="left", font=dict(color=T["muted"], size=12))
+    base_layout(fig, height=380, title=dict(text="Corte de la pila (esquema)", font=dict(size=15)))
+    fig.update_xaxes(visible=False, range=[-2.5, 2.5])
+    fig.update_yaxes(visible=False, range=[-0.25, 1.9], scaleanchor="x", scaleratio=1)
+    return fig
+
+
+def curve_figure(day):
+    fig = go.Figure()
+    bands = [(15, 40, "#3C8DBC", "Mesófila"), (40, 55, "#E0B02E", "Termófila"), (55, 65, "#E8833A", "Higienización"), (65, 72, "#D64545", "Exceso")]
+    for y0, y1, c, name in bands:
+        fig.add_hrect(y0=y0, y1=y1, fillcolor=c, opacity=0.14, line_width=0)
+        fig.add_annotation(x=89, y=(y0 + y1) / 2, text=name, showarrow=False, xanchor="right", font=dict(size=11, color=T["muted"]))
+    fig.add_trace(go.Scatter(x=_DAYS, y=CURVE_T, mode="lines", line=dict(width=4, color=T["c1"]), name="Temperatura del núcleo", hovertemplate="Día %{x}: %{y:.0f} °C<extra></extra>"))
+    fig.add_vline(x=day, line_dash="dash", line_color=T["warn"])
+    fig.add_trace(go.Scatter(x=[day], y=[CURVE_T[day]], mode="markers", marker=dict(size=14, color=T["warn"], line=dict(color="#fff", width=2)), showlegend=False, hoverinfo="skip"))
+    base_layout(fig, height=360, showlegend=False, title=dict(text="Curva ilustrativa de temperatura (no son mediciones)", font=dict(size=15)))
+    fig.update_xaxes(title="Día del proceso", range=[0, 90], gridcolor=T["border"], zeroline=False)
+    fig.update_yaxes(title="Temperatura (°C)", range=[15, 72], gridcolor=T["border"], zeroline=False)
+    return fig
+
+
+def page_compost():
+    heading("07 · Biomasa y energía térmica", "Compostaje y calor",
+            "Explorá las fases de una pila de compost y diferenciá el calor que libera de la energía que realmente se podría recuperar.")
+    st.markdown("La investigación describe que en la escuela se mide la temperatura de las pilas, pero no se registra directamente el calor liberado. Por eso las simulaciones de esta sección son ejercicios didácticos: **sirven para razonar con la Física, no son mediciones del IPEA.**")
     st.markdown("### Tres procesos estudiados en el IPEA")
-    cols=st.columns(3)
-    data=[("Compost","Estiércol, paja y restos vegetales.","Entre 3 y 6 meses"),("Bokashi","Materiales similares, con levadura, azúcar y polvillo de maíz.","Alrededor de 20 días"),("Lombricompuesto","Material que ya pasó la fase termófila, procesado con lombrices.","Etapa final")]
-    for c,(title,desc,time) in zip(cols,data):
-        with c: st.markdown(f'<div class="card"><div class="kicker">{time}</div><h3>{title}</h3><p>{desc}</p></div>',unsafe_allow_html=True)
-    st.caption("Los tiempos son los consignados en el material de investigación y pueden variar según las condiciones de proceso.")
-    st.link_button("Abrir la aplicación de compostaje del IPEA", "https://manejo-de-variables-compost-upc-fisica.streamlit.app/", use_container_width=True)
+    cards([card_html("Entre 3 y 6 meses", "Compost", "Estiércol, paja y restos vegetales."),
+           card_html("Alrededor de 20 días", "Bokashi", "Materiales similares, con levadura, azúcar y polvillo de maíz."),
+           card_html("Etapa final", "Lombricompuesto", "Material que ya pasó la fase termófila, procesado con lombrices.")])
+    st.caption("Los tiempos son los consignados en el material de investigación y pueden variar según las condiciones del proceso.")
+    st.link_button("Abrir la aplicación de compostaje del IPEA", "https://manejo-de-variables-compost-upc-fisica.streamlit.app/", **STRETCH)
     st.caption("La aplicación enlazada es un recurso complementario independiente; se abre en otra pestaña o ventana según el navegador.")
     st.divider()
-    st.markdown("### Explorador conceptual de fases")
-    st.write("La curva siguiente es un esquema didáctico, no una serie de mediciones del IPEA. Sirve para relacionar el tiempo transcurrido con las fases habituales mencionadas en la presentación.")
-    day = st.slider("Día del proceso (escenario ilustrativo)", 1, 120, 18)
-    timeline_x = np.arange(1, 121)
-    # Conceptual curve, intentionally labelled illustrative rather than measured.
-    timeline_y = 22 + 38*np.exp(-((timeline_x-18)/17)**2) + 18*np.exp(-((timeline_x-38)/27)**2) - 0.08*timeline_x
-    timeline_y = np.clip(timeline_y, 20, 65)
-    tf = go.Figure(go.Scatter(x=timeline_x, y=timeline_y, mode="lines", line=dict(color="#16836a", width=3), name="Curva conceptual"))
-    tf.add_vline(x=day, line_dash="dash", line_color="#d6a73b")
-    tf.add_trace(go.Scatter(x=[day], y=[timeline_y[day-1]], mode="markers", marker=dict(size=12, color="#d6a73b"), name="Día seleccionado"))
-    tf.update_layout(height=300, margin=dict(l=10,r=10,t=20,b=10), xaxis_title="Día", yaxis_title="Temperatura (°C)", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="white")
-    st.plotly_chart(tf, use_container_width=True)
-    if day < 7:
-        phase = "Etapa inicial / mesófila (referencia conceptual)"
-    elif day < 35:
-        phase = "Posible etapa de mayor actividad térmica (referencia conceptual)"
-    elif day < 75:
-        phase = "Enfriamiento (referencia conceptual)"
-    else:
-        phase = "Maduración (referencia conceptual)"
-    st.info(f"Día {day}: {phase}. La fase real debe identificarse con mediciones de la pila y criterios técnicos, no solo con el día del proceso.")
+
+    st.markdown("### Simulador: ¿qué pasa dentro de la pila?")
+    c1, c2 = st.columns(2, gap="large")
+    with c1:
+        day = st.slider("Día del proceso", 0, 90, 14, key="comp_day")
+    with c2:
+        mass = st.slider("Masa de la pila (kg)", 200, 2500, 1000, 100, key="comp_mass")
+    t_core = float(CURVE_T[day])
+    ph = PHASES[phase_of(day, t_core)]
+    left, right = st.columns([1, 1], gap="large")
+    with left:
+        plot(pile_figure(t_core, mass))
+    with right:
+        plot(curve_figure(day))
+    st.markdown(f'<div class="phase" style="border-left-color:{ph[1]}"><div class="kicker">Día {day} · {ph[2]}</div><h3>{ph[0]}</h3><p>{ph[3]}</p></div>', unsafe_allow_html=True)
+    st.caption("La curva es un esquema didáctico. Las fases reales se identifican con mediciones de la pila y criterios técnicos, no solo con el día del proceso. En el interior la temperatura es mayor que en la superficie porque la pila se enfría hacia el aire y el suelo.")
+
+    st.divider()
+    st.markdown("### ¿Cuánto calor se podría recuperar?")
+    st.write("Para calentar agua con una pila hace falta un intercambiador de calor. Con estos controles podés comparar el calor que aporta la pila con el que pide un invernadero. Los valores iniciales son un **ejemplo simulado** (1.000 kg, 18 días, agua de 20 °C a 40 °C).")
+    k1, k2, k3 = st.columns(3, gap="large")
+    with k1:
+        m_pila = st.slider("Masa de la pila (kg)", 200, 3000, 1000, 100, key="rec_mass")
+        q_util = st.slider("Calor útil recuperable (kJ por kg de pila y por día)", 5.0, 40.0, 17.9, 0.5, key="rec_q",
+                           help="Supuesto del ejemplo: parte del calor que libera la pila y que el intercambiador logra pasar al agua.")
+    with k2:
+        t0 = st.slider("Temperatura inicial del agua (°C)", 5, 30, 20, key="rec_t0")
+        t1 = st.slider("Temperatura final del agua (°C)", 30, 70, 40, key="rec_t1")
+        dias = st.slider("Días de suministro", 1, 60, 18, key="rec_days")
+    with k3:
+        area = st.slider("Superficie del invernadero (m²)", 4, 100, 24, key="rec_area")
+        dT = st.slider("Diferencia de temperatura interior−exterior (°C)", 2, 25, 10, key="rec_dT")
+    c_agua = 4186
+    delta = max(1, t1 - t0)
+    litros = m_pila * q_util * 1000 / (c_agua * delta)
+    kwh_dia = m_pila * q_util / 3600
+    kwh_total = kwh_dia * dias
+    demanda = 6.0 * (3 * area) * dT * 24 / 1000
+    cobertura = 100 * kwh_dia / demanda if demanda else 0
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Agua calentada por día", f"{litros:,.0f} L".replace(",", "."))
+    m2.metric("Calor aportado por día", f"{kwh_dia:.1f} kWh".replace(".", ","))
+    m3.metric(f"Calor en {dias} días", f"{kwh_total:.0f} kWh")
+    m4.metric("Cobertura del invernadero", f"{cobertura:.0f} %")
+    fig = go.Figure(go.Bar(x=[kwh_dia, demanda], y=["Calor que aporta la pila", f"Calor que pide el invernadero ({area} m²)"], orientation="h",
+                           marker=dict(color=[T["c1"], T["warn"]]), text=[f"{kwh_dia:.1f} kWh/día".replace(".", ","), f"{demanda:.0f} kWh/día"], textposition="auto",
+                           hoverinfo="skip"))
+    base_layout(fig, height=200, title=dict(text="Aporte frente a demanda (kWh por día)", font=dict(size=15)))
+    fig.update_xaxes(gridcolor=T["border"], zeroline=False)
+    plot(fig)
+    m_txt = f"{m_pila:,}".replace(",", ".")
+    callout(f"<b>Lectura.</b> Con estos supuestos, una pila de {m_txt} kg aporta cerca del {cobertura:.0f} % de lo que pide un invernadero de {area} m²: haría falta del orden de {max(1, round(demanda / kwh_dia))} pilas como esa. "
+            "Es el tipo de razonamiento de escala que buscamos con los estudiantes.")
+    st.caption("Supuestos del invernadero: cubierta de polietileno con transmitancia de 6 W/(m²·K) y superficie de envolvente igual a 3 veces la superficie del piso. Son valores de ejemplo, no mediciones.")
+
+    st.markdown("### El cálculo que hacen los estudiantes")
+    a, b = st.columns(2, gap="large")
+    with a:
+        masa = st.number_input("Masa de agua (kg)", min_value=1.0, max_value=10000.0, value=100.0, step=10.0, key="q_m")
+        ta = st.slider("Temperatura inicial (°C)", 0, 40, 20, key="q_t0")
+        tb = st.slider("Temperatura final (°C)", 20, 90, 40, key="q_t1")
+        q = masa * c_agua * max(0, tb - ta)
+        mm1, mm2 = st.columns(2)
+        mm1.metric("Calor transferido al agua", f"{q:,.0f} J".replace(",", "."))
+        mm2.metric("Equivalencia", f"{q / 3.6e6:.2f} kWh".replace(".", ","))
+    with b:
+        st.markdown(f'<div class="card"><div class="kicker">Modelo físico</div><h3>Q = m · c · ΔT</h3><p><b>m</b>: masa de agua (kg)<br><b>c</b>: calor específico del agua (aprox. 4186 J/kg·°C)<br><b>ΔT</b>: variación de temperatura</p><hr>'
+                    f'<div class="kicker">Escenario elegido</div><div class="big-number">{max(0, tb - ta):.1f} °C</div><p>Incremento de temperatura del agua durante el cálculo.</p>'
+                    '<p class="small-muted">Este cálculo no predice el calor real disponible en una pila de compost. Para eso se necesitan mediciones y un modelo de pérdidas, duración y recuperación térmica.</p></div>', unsafe_allow_html=True)
     st.markdown("### Del modelo a una pregunta de investigación")
     st.write("¿Qué mediciones harían falta para estimar el calor que una pila podría transferir? Considerá masa, variación de temperatura, duración, pérdidas térmicas y eficiencia del sistema de intercambio.")
 
-elif page == "Propuestas didácticas":
-    heading("06 · Transposición didáctica", "Cuatro niveles, un territorio", "Las propuestas responden a brechas y demandas identificadas en el análisis. Son diseños a validar: todavía no se aplicaron en el aula.")
-    tabs=st.tabs(["Inicial","Primario","Secundario","Superior"])
+
+def page_propuestas():
+    heading("08 · Transposición didáctica", "Cuatro niveles, un territorio",
+            "Las propuestas responden a brechas y demandas identificadas en el análisis. Son diseños a validar: todavía no se aplicaron en el aula.")
+    tabs = st.tabs(["Inicial", "Primario", "Secundario", "Superior"])
     with tabs[0]:
         st.markdown("### Descubriendo la fuerza del Sol, el viento y el agua")
-        st.markdown("- **Calor y luz del Sol:** comparar agua al Sol y a la sombra.\n- **Fuerza del viento:** molinillos de papel y preguntas sobre el movimiento.\n- **Agua que empuja:** canaletas y ruedas de paleta.\n- **Salida optativa:** visita al IPEA N.° 211, sujeta a acuerdo institucional.\n\n**Evaluación:** registro de observaciones, portafolio de dibujos y rúbrica cualitativa.")
+        cards([card_html("1", "Calor y luz del Sol", "Agua al Sol y a la sombra: anticipan y comprueban con las manos."),
+               card_html("2", "Fuerza del viento", "Molinillos de papel: ¿se mueven si corremos o si sopla el viento?"),
+               card_html("3", "Agua que empuja", "Mesa de agua con canaletas y ruedas de paleta."),
+               card_html("4 · Optativa", "Salida al IPEA N.° 211", "¿Una pila de compost está tibia o fría? Sujeta a acuerdo institucional.")], cols=4)
+        callout("<b>Evaluación:</b> registro de observaciones, portafolio de dibujos y rúbrica cualitativa.")
     with tabs[1]:
         st.markdown("### El circuito energético regional de Cruz del Eje")
-        st.markdown("- **Paisaje energético:** mapa y fotografías del dique y de la central.\n- **Maquetas y kits:** depósito, manguera, turbina y LED.\n- **Eficiencia energética:** relevar artefactos en watts y proponer una campaña familiar.\n- **Visita optativa:** comparar la maqueta con la central real.\n\nPrimer ciclo: identificar fuentes. Segundo ciclo: explicar cómo funciona una central.")
+        cards([card_html("1", "Paisaje energético", "Mapa y fotografías auténticas del dique y de la central."),
+               card_html("2", "Maquetas y kits", "Depósito, manguera, turbina y LED; versión de bajo costo."),
+               card_html("3", "Eficiencia energética", "Relevar artefactos en watts y armar una campaña familiar."),
+               card_html("4 · Optativa", "Visita a Ferroviario", "Comparar la maqueta con la central real.")], cols=4)
+        callout("Primer ciclo: identificar fuentes. Segundo ciclo: explicar cómo funciona una central.")
     with tabs[2]:
         st.markdown("### Un puente entre Tecnología y Física")
-        st.markdown("1. **Tecnología:** diagrama de bloques desde la toma de agua al transformador.\n2. **Física:** potencia hidráulica P = ρ·g·Q·H con H = 28 m y ensayo de Faraday-Lenz.\n3. **Caso IPEA:** compost, bokashi y lombricompuesto como procesos exotérmicos.\n4. **Página web:** cargar temperaturas, calcular calor y simular su recuperación.\n\nEvaluación mediante rúbrica del producto, indicadores de logro y cierre con Padlet o Mentimeter.")
+        cards([card_html("Fase 1 · Tecnología", "Diagrama de bloques", "De la toma de agua al transformador."),
+               card_html("Fase 2 · Física", "Potencia hidráulica", "P = ρ·g·Q·H con H = 28 m y ensayo de Faraday-Lenz. Podés usar el laboratorio 3D."),
+               card_html("Fase 3 · Caso IPEA", "Procesos exotérmicos", "Compost, bokashi y lombricompuesto."),
+               card_html("Fase 4 · Página web", "Calor y recuperación", "Cargar temperaturas, calcular el calor y simular su recuperación.")], cols=4)
+        callout("<b>Evaluación:</b> rúbrica del producto, indicadores de logro y cierre con Padlet o Mentimeter.")
     with tabs[3]:
         st.markdown("### Hidrodinámica, riesgos laborales y gestión ambiental")
-        st.markdown("- **Modelización:** Bernoulli con pérdidas y número de Reynolds en la tubería.\n- **Riesgos laborales:** matriz IPERC para la central y el IPEA, riesgos eléctricos, alturas y espacios confinados, y procedimiento LOTO.\n- **Balance de calor:** explorar si el calor del compost podría calentar agua o un invernadero.\n\n**Producto:** proyecto de práctica profesionalizante, con manual de seguridad y auditoría ambiental.")
+        cards([card_html("A", "Modelización hidrodinámica", "Bernoulli con pérdidas y número de Reynolds en la tubería de la central. ¿El efecto Venturi optimiza la salida de la turbina?"),
+               card_html("B", "Riesgos laborales", "Matriz IPERC para la central y el IPEA: riesgo eléctrico, alturas y espacios confinados, y procedimiento LOTO."),
+               card_html("C", "Balance de calor", "¿Alcanza el calor del compost para calentar agua o un invernadero? Usá el simulador de compostaje.")])
+        callout("<b>Producto:</b> proyecto de práctica profesionalizante, con manual de seguridad y auditoría ambiental.")
     st.divider()
     st.markdown("### Recursos digitales")
-    st.markdown("- [Aviso ambiental 2026 · Parque Solar Fotovoltaico Cruz del Eje](https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/)\n- [Antecedente técnico 2022 · EPEC](https://www.epec.com.ar/docs/imagenes/comunidad/blog/88/ANEXO3_PROYECTOS_PROPUESTOS_POR_EPEC_Convocatoria2022.pdf)\n- [Mapa educativo nacional · IPEA N.º 211](https://mapa.educacion.gob.ar/legajo/140256100)\n- [Central hidroeléctrica Cruz del Eje · EPEC](https://web.epec.com.ar/generacion_central_h_cruz-eje.html)\n- [Ley de Educación Ambiental Integral · Argentina.gob.ar](https://www.argentina.gob.ar/normativa/nacional/ley-27621-350594/texto)")
+    st.markdown("- [Aviso ambiental 2026 · Parque Solar Fotovoltaico Cruz del Eje](https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/)\n"
+                "- [Antecedente técnico 2022 · EPEC](https://www.epec.com.ar/docs/imagenes/comunidad/blog/88/ANEXO3_PROYECTOS_PROPUESTOS_POR_EPEC_Convocatoria2022.pdf)\n"
+                "- [Mapa educativo nacional · IPEA N.º 211](https://mapa.educacion.gob.ar/legajo/140256100)\n"
+                "- [Central hidroeléctrica Cruz del Eje · EPEC](https://web.epec.com.ar/generacion_central_h_cruz-eje.html)\n"
+                "- [Ley de Educación Ambiental Integral · Argentina.gob.ar](https://www.argentina.gob.ar/normativa/nacional/ley-27621-350594/texto)")
 
-else:
-    heading("07 · Hallazgos", "¿Qué nos dice la investigación?", "Los resultados son exploratorios: la muestra por conveniencia no permite generalizar a todos los docentes o instituciones.")
-    cols=st.columns(3)
-    with cols[0]: metric_card("Contexto local en documentos", "0", "Documentos que lo mencionan de forma explícita, según el análisis.")
-    with cols[1]: metric_card("Contexto local en docentes", "5 de 6", "Docentes que lo usan o lo mencionan en sus clases.")
-    with cols[2]: metric_card("Demanda de apoyos", "5 de 6", "Docentes que piden recursos o capacitación didáctica.")
+
+def page_resultados():
+    heading("09 · Hallazgos", "¿Qué nos dice la investigación?", "Los resultados son exploratorios: la muestra por conveniencia no permite generalizar a todos los docentes o instituciones.")
+    cards([metric_card("Contexto local en documentos", "0", "Documentos que lo mencionan de forma explícita, según el análisis."),
+           metric_card("Contexto local en docentes", "5 de 6", "Docentes que lo usan o lo mencionan en sus clases."),
+           metric_card("Demanda de apoyos", "5 de 6", "Docentes que piden recursos o capacitación didáctica.")])
+    st.markdown("### Contraste provisorio de las hipótesis")
+    st.markdown(table_html(["Hipótesis", "Estado", "Por qué"], [
+        ["<b>H1</b> Profundidad", "<span class='badge'>Confirmada parcialmente</span>", "La presencia real supera a la prescripta."],
+        ["<b>H2</b> Apoyos", "<span class='badge'>Parcialmente sostenida</span>", "La demanda de recursos es mayoritaria; el apoyo en manuales no."],
+        ["<b>H3</b> Contexto local", "<span class='badge'>Confirmada en documentos; no en prácticas</span>", "Depende de la iniciativa docente."],
+        ["<b>H4</b> Articulación", "<span class='badge'>Confirmada parcialmente</span>", "Existe donde la institución la sostiene."]], widths=[24, 30, 46]), unsafe_allow_html=True)
     st.write("")
-    labels=["H1 · Profundidad","H2 · Apoyos","H3 · Contexto local","H4 · Articulación"]
-    states=["Confirmada parcialmente","Parcialmente sostenida","Confirmada en documentos; no en prácticas","Confirmada parcialmente"]
-    for lab,state in zip(labels,states):
-        st.markdown(f'<div class="card" style="margin-bottom:.6rem"><b>{lab}</b><br><span class="small-muted">{state}</span></div>',unsafe_allow_html=True)
     st.markdown("### Conclusiones")
-    st.markdown("1. La ausencia en el currículo no equivale a ausencia en el aula.\n2. El anclaje local depende de la iniciativa docente y de la institución.\n3. La articulación entre niveles existe donde hay un dispositivo que la sostiene.\n4. Hace falta un recurso con rigor físico: visitas, maquetas y herramientas digitales.")
+    cards([f'<div class="card"><div class="big-number" style="font-size:1.6rem">{i}</div><p>{t}</p></div>' for i, t in enumerate([
+        "La ausencia en el currículo no equivale a ausencia en el aula: lo enseñado puede exceder lo prescripto.",
+        "El anclaje local depende de la iniciativa docente y de la institución, no del currículo.",
+        "La articulación entre niveles existe donde hay un dispositivo que la sostiene.",
+        "Hace falta un recurso con rigor físico: visitas, maquetas y herramientas digitales, no convencer de usar el contexto."], 1)], cols=4)
     st.markdown("### Limitaciones y próximos pasos")
-    st.markdown("- La muestra por conveniencia no permite generalizar.\n- Se analizan prácticas declaradas, no observadas.\n- El nivel superior está representado por una sola docente.\n- Las propuestas deben validarse con docentes y la página web debe probarse en una escuela.\n- Próximos pasos: ampliar la muestra y desarrollar guías de actividades por nivel.")
+    cards([card_html("Limitaciones", "Lo que hay que tener presente", "• Muestra por conveniencia: no permite generalizar.<br>• Prácticas declaradas, no observadas.<br>• Un solo docente de nivel superior.<br>• Entrevista de primario respondida por escrito.<br>• Documento del 6.° año técnico no disponible."),
+           card_html("Próximos pasos", "Hacia adelante", "• Validar las propuestas con los docentes entrevistados.<br>• Probar la página web en una escuela.<br>• Armar las guías de actividades por nivel.<br>• Ampliar la muestra a más docentes por nivel.")], cols=2)
+    st.write("")
+    st.markdown(f"""<div class="hero" style="min-height:230px;text-align:center;align-items:center"><div class="eyebrow">Muchas gracias</div>
+<h1 style="font-size:clamp(2rem,4vw,3.2rem)">¿Preguntas?</h1><p style="margin:0 auto">{' · '.join(TEAM)}</p>
+<p style="margin:.4rem auto 0;font-size:.95rem">Profesorado Universitario de Física · UPC · Sede Cruz del Eje · 2026</p></div>""", unsafe_allow_html=True)
 
+
+ROUTES = {
+    "Presentación del equipo": page_portada, "Inicio": page_inicio, "La investigación": page_investigacion, "Documentos y docentes": page_documentos,
+    "Mapa energético local": page_mapa, "Cruz del Eje": page_cruz, "Registro de campo": page_registro, "Laboratorio hidráulico 3D": page_laboratorio,
+    "Compostaje y calor": page_compost, "Propuestas didácticas": page_propuestas, "Resultados y conclusiones": page_resultados,
+}
+ROUTES[page]()
+
+# ───────────────────────── Navegación secuencial ─────────────────────────
 st.divider()
-# Navegación secuencial: mantiene el menú lateral y añade un recorrido con flechas.
-current_index = pages.index(page)
-nav_left, nav_mid, nav_right = st.columns([1, 2, 1])
-with nav_left:
-    if current_index > 0:
-        st.button("← Anterior", use_container_width=True, on_click=set_page, args=(pages[current_index - 1],))
-with nav_mid:
-    st.markdown(f'<div class="nav-note" style="text-align:center;padding-top:.55rem">Sección {current_index + 1} de {len(pages)} · {page}</div>', unsafe_allow_html=True)
-with nav_right:
-    if current_index < len(pages) - 1:
-        st.button("Siguiente →", use_container_width=True, type="primary", on_click=set_page, args=(pages[current_index + 1],))
-st.markdown("<div style='display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;color:#60756d;font-size:.85rem'><span>La energía renovable como contenido escolar</span><span>Profesorado Universitario de Física · UPC · 2026</span></div>",unsafe_allow_html=True)
+idx = PAGES.index(page)
+nl, nm, nr = st.columns([1, 2, 1])
+with nl:
+    if idx > 0:
+        st.button("← Anterior", key="prev", on_click=go_to, args=(PAGES[idx - 1],), **STRETCH)
+with nm:
+    st.markdown(f'<div class="nav-note" style="text-align:center;padding-top:.55rem">Sección {idx + 1} de {len(PAGES)} · {page}</div>', unsafe_allow_html=True)
+with nr:
+    if idx < len(PAGES) - 1:
+        st.button("Siguiente →", key="next", type="primary", on_click=go_to, args=(PAGES[idx + 1],), **STRETCH)
+st.markdown("<div style='display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;color:var(--muted);font-size:.85rem'><span>La energía renovable como contenido escolar</span><span>Profesorado Universitario de Física · UPC · 2026</span></div>", unsafe_allow_html=True)
