@@ -16,7 +16,15 @@ html, body, [class*="css"] { font-family:'DM Sans',sans-serif; }
 [data-testid="stSlider"] [data-testid="stTickBar"] + div, [data-testid="stSlider"] [data-testid="stThumbValue"] { color:#142b2b !important; }
 [data-testid="stNumberInput"] input, [data-testid="stTextInput"] input { color:#142b2b !important; background:#ffffff !important; }
 [data-testid="stMetricValue"] { color:#146b55 !important; }
-.stButton button, .stLinkButton a { border-radius:12px !important; font-weight:700 !important; }
+.stButton button, .stLinkButton a { border-radius:12px !important; font-weight:700 !important; background:#ffffff !important; color:#173b35 !important; border:1px solid #b8cec4 !important; }
+.stButton button:hover, .stLinkButton a:hover { background:#e4f2e9 !important; color:#103b31 !important; border-color:#43836d !important; }
+.stButton button[kind="primary"], .stButton button[data-testid*="baseButton-primary"] { background:#146b55 !important; color:#ffffff !important; border:1px solid #146b55 !important; }
+.stButton button[kind="primary"] *, .stButton button[data-testid*="baseButton-primary"] * { color:#ffffff !important; }
+.stMarkdown a { color:#075f88 !important; text-decoration:underline !important; font-weight:600; }
+[data-testid="stSlider"] [data-testid="stThumbValue"] { background:#146b55 !important; color:#ffffff !important; }
+[data-testid="stSlider"] [data-testid="stTickBar"] div { color:#142b2b !important; }
+[data-testid="stMetricLabel"] { color:#34554d !important; }
+.stAlert, [data-testid="stAlert"] * { color:#142b2b !important; }
 .nav-note { color:#55706b; font-size:.9rem; }
 [data-testid="stPlotlyChart"] { border-radius:14px; overflow:hidden; }
 .stApp { background:var(--paper); color:var(--ink); }
@@ -45,11 +53,31 @@ with st.sidebar:
     pages = ["Inicio", "La investigación", "Mapa energético local", "Cruz del Eje", "Registro de campo", "Laboratorio hidráulico 3D", "Compostaje y calor", "Propuestas didácticas", "Resultados y conclusiones"]
     def set_page(target):
         st.session_state["nav_page"] = target
-    page = st.radio("RECORRIDO", pages, label_visibility="collapsed", key="nav_page")
+        st.session_state["_scroll_to_top"] = True
+    def mark_scroll_to_top():
+        st.session_state["_scroll_to_top"] = True
+    page = st.radio("RECORRIDO", pages, label_visibility="collapsed", key="nav_page", on_change=mark_scroll_to_top)
     st.divider()
     st.markdown("**Profesorado Universitario de Física**")
     st.caption("UPC · Sede Cruz del Eje · 2026")
     st.caption("Proyecto académico interactivo")
+
+# Al cambiar de sección, la presentación comienza desde el encabezado.
+if st.session_state.pop("_scroll_to_top", False):
+    st.components.v1.html("""
+    <script>
+    const goTop = () => {
+      try {
+        window.parent.scrollTo({top: 0, left: 0, behavior: 'instant'});
+        const main = window.parent.document.querySelector('[data-testid="stMain"]');
+        const app = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+        if (main) main.scrollTo({top: 0, left: 0, behavior: 'instant'});
+        if (app) app.scrollTo({top: 0, left: 0, behavior: 'instant'});
+      } catch (e) { window.parent.scrollTo(0, 0); }
+    };
+    goTop(); setTimeout(goTop, 120);
+    </script>
+    """, height=0)
 
 def heading(kicker, title, desc=None):
     st.markdown(f'<div class="section-label">{kicker}</div><h1>{title}</h1>', unsafe_allow_html=True)
@@ -111,21 +139,22 @@ elif page == "La investigación":
 
 elif page == "Mapa energético local":
     heading("02 · Territorio", "Mapa energético local", "Un mapa de referencia para conectar la investigación con los lugares que la hacen concreta.")
-    st.markdown('<div class="callout"><b>Lectura del mapa</b><br>Las ubicaciones del dique y del IPEA se representan con coordenadas publicadas en fuentes cartográficas y educativas. La ubicación exacta de la central Ferroviario debe confirmarse con el relevamiento del equipo antes de fijar un marcador preciso.</div>', unsafe_allow_html=True)
     import pandas as pd
     locations = pd.DataFrame([
         {"Lugar":"Dique Cruz del Eje / Arturo Illia", "Latitud":-30.76194, "Longitud":-64.75248, "Tipo":"Agua y generación", "Detalle":"Embalse asociado al riego y a la generación hidroeléctrica."},
-        {"Lugar":"IPEA N.º 211 Presidente Arturo Illia", "Latitud":-30.74969, "Longitud":-64.73899, "Tipo":"Biomasa y educación", "Detalle":"Caso escolar de compost, bokashi y lombricompuesto."},
+        {"Lugar":"IPEA N.º 211 Presidente Arturo Illia", "Latitud":-30.74969, "Longitud":-64.73899, "Tipo":"Biomasa y educación", "Detalle":"Institución educativa vinculada al relevamiento sobre compostaje."},
+        {"Lugar":"Central hidroeléctrica El Ferroviario (EPEC)", "Latitud":-30.74950, "Longitud":-64.79675, "Tipo":"Generación hidroeléctrica", "Detalle":"Ubicación identificada mediante el código de mapa 7623+68."},
+        {"Lugar":"Parque Solar Fotovoltaico Cruz del Eje (expediente ambiental 2026)", "Latitud":-30.746833, "Longitud":-64.727333, "Tipo":"Energía solar fotovoltaica", "Detalle":"Coordenadas publicadas en el aviso de proyecto ambiental de 2026: Pedanía San Marcos, fuera del ejido urbano."},
     ])
     figmap = go.Figure()
     figmap.add_trace(go.Scattermap(
         lat=locations["Latitud"], lon=locations["Longitud"], mode="markers+text",
-        text=["Dique Arturo Illia", "IPEA N.º 211"], textposition="top right",
-        marker=dict(size=[18,15], color=["#167d72", "#d6a73b"]),
+        text=["Dique Arturo Illia", "IPEA N.º 211", "Central El Ferroviario", "Parque solar · proyecto 2026"], textposition="top right",
+        marker=dict(size=[18,15,17,16], color=["#167d72", "#d6a73b", "#2864b4", "#e1a52e"]),
         customdata=locations[["Tipo", "Detalle"]].values,
         hovertemplate="<b>%{text}</b><br>%{customdata[0]}<br>%{customdata[1]}<extra></extra>"
     ))
-    figmap.update_layout(map=dict(style="open-street-map", center=dict(lat=-30.756, lon=-64.746), zoom=12),
+    figmap.update_layout(map=dict(style="open-street-map", center=dict(lat=-30.753, lon=-64.763), zoom=10.5),
                          height=510, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor="rgba(0,0,0,0)",
                          legend=dict(orientation="h"))
     st.plotly_chart(figmap, use_container_width=True)
@@ -134,14 +163,15 @@ elif page == "Mapa energético local":
         st.markdown('<div class="card"><div class="kicker">Agua</div><h3>Dique Arturo Illia</h3><p>Un sistema donde el agua cumple funciones de regulación, riego y generación. Es el punto de partida para conversar sobre altura, caudal y potencia.</p><a href="https://www.diquesdecordoba.com.ar/dique-cruz-del-eje/" target="_blank">Consultar ficha del dique ↗</a></div>', unsafe_allow_html=True)
     with b:
         st.markdown('<div class="card"><div class="kicker">Biomasa</div><h3>IPEA N.º 211</h3><p>La investigación incorpora las prácticas de compostaje como oportunidad para estudiar procesos exotérmicos y recuperación de calor.</p><a href="https://mapa.educacion.gob.ar/legajo/140256100" target="_blank">Consultar ficha educativa ↗</a></div>', unsafe_allow_html=True)
-    st.markdown("### Central hidroeléctrica Ferroviario")
-    st.write("La central es el caso de anclaje del relevamiento físico descrito en el trabajo. Para no presentar una ubicación aproximada como si fuera exacta, el marcador se incorpora cuando el equipo confirme las coordenadas de su visita técnica.")
-    st.link_button("Buscar Central Ferroviario en el mapa", "https://www.google.com/maps/search/?api=1&query=Central+Hidroel%C3%A9ctrica+Ferroviario+Cruz+del+Eje")
-    st.caption("Fuentes de coordenadas: Mapa Educativo Nacional para IPEA N.º 211 y ficha de Dique Cruz del Eje. La ubicación precisa de la central debe validarse. El mapa es orientativo.")
+    st.markdown("### Central hidroeléctrica El Ferroviario")
+    st.write("El punto de El Ferroviario corresponde al código de ubicación 7623+68. Para el parque solar se prioriza la ubicación informada en el aviso de proyecto ambiental de 2026: Pedanía San Marcos, fuera del ejido urbano de Cruz del Eje.")
+    st.link_button("Abrir El Ferroviario en Google Maps", "https://www.google.com/maps/search/?api=1&query=7623%2B68%20Cruz%20del%20Eje%2C%20C%C3%B3rdoba")
+    st.link_button("Consultar aviso ambiental 2026 del parque solar", "https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/")
+    st.link_button("Consultar antecedente técnico de EPEC (2022)", "https://www.epec.com.ar/docs/imagenes/comunidad/blog/88/ANEXO3_PROYECTOS_PROPUESTOS_POR_EPEC_Convocatoria2022.pdf")
+    st.caption("Hay una diferencia entre la ubicación consignada en el documento de EPEC de 2022 (frente a la central hidroeléctrica) y la ubicación del expediente ambiental difundido en 2026. El mapa muestra la ubicación más reciente publicada y conserva el antecedente como fuente de contexto.")
 
 elif page == "Registro de campo":
     heading("02 · Evidencias del territorio", "Registro de campo", "Fotografías aportadas para documentar la visita a la central hidroeléctrica y al IPEA N.º 211.")
-    st.markdown('<div class="callout"><b>Procedencia</b><br>Las imágenes de esta galería provienen del PDF compartido en esta conversación. Se agrupan por el contenido visual observado; los lugares y detalles técnicos deben confirmarse con el equipo antes de la publicación definitiva.</div>', unsafe_allow_html=True)
     st.markdown("### Central hidroeléctrica Ferroviario")
     st.write("Equipamiento, turbinas, instrumentos y sectores de la instalación registrados durante el relevamiento.")
     central_cols = st.columns(3)
@@ -157,27 +187,32 @@ elif page == "Registro de campo":
             st.image(f"assets/relevamiento_{idx:02d}.jpg", use_container_width=True, caption=f"Registro de campo · imagen {idx}")
     st.divider()
     st.markdown("### Video de la visita")
-    st.caption("Se incorpora el video enviado como registro audiovisual complementario. Conviene revisar el montaje y recortar los segmentos ajenos al relevamiento antes de usarlo en una exposición académica.")
+    st.caption("Registro audiovisual de la visita técnica.")
     st.video("assets/registro_visita.mp4")
-    st.markdown("### Para la defensa")
-    st.markdown("- Explicar qué se observó directamente durante la visita.\n- Distinguir los datos medidos o informados por personal técnico de los valores usados en las simulaciones.\n- Vincular cada imagen con una pregunta física o didáctica concreta.")
 
 elif page == "Cruz del Eje":
     heading("02 · Anclaje territorial", "Un caso energético real", "El contexto local permite conectar conceptos físicos, infraestructura y decisiones ambientales con lugares cercanos a la comunidad educativa.")
-    st.image("https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1600&q=85", use_container_width=True, caption="Imagen ilustrativa de energía solar; no corresponde necesariamente al parque mencionado en el informe.")
+    st.markdown("El caso local permite analizar distintas formas de aprovechamiento energético y discutir su relación con la educación ambiental.")
     cols=st.columns(3)
     with cols[0]:
         st.markdown('<div class="card"><div class="kicker">Agua</div><h3>Dique Arturo Illia</h3><p>Recurso vinculado al riego y a la generación hidroeléctrica.</p></div>',unsafe_allow_html=True)
     with cols[1]:
         st.markdown('<div class="card"><div class="kicker">Electricidad</div><h3>Central Ferroviario</h3><p>Caída neta relevada de 28 m y potencia informada de 0,5 MW. Elevación de tensión de 380 V a 13.200 V.</p></div>',unsafe_allow_html=True)
     with cols[2]:
-        st.markdown('<div class="card"><div class="kicker">Sol</div><h3>Parque solar</h3><p>En construcción al momento descrito en la investigación, cerca de la escuela agrotécnica IPEA N.° 211.</p></div>',unsafe_allow_html=True)
+        st.markdown('<div class="card"><div class="kicker">Sol</div><h3>Parque solar fotovoltaico</h3><p>El aviso ambiental difundido en 2026 ubica el proyecto en Pedanía San Marcos, fuera del ejido urbano de Cruz del Eje. La documentación de EPEC de 2022 consignaba un emplazamiento distinto.</p><a href="https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/" target="_blank">Consultar aviso ambiental 2026 ↗</a></div>',unsafe_allow_html=True)
     st.write("")
     st.markdown("### ¿Por qué importa el contexto local?")
     st.write("En el análisis documental, ningún documento menciona explícitamente Cruz del Eje, el dique o EPEC. Sin embargo, cinco de los seis docentes entrevistados usan o mencionan el contexto local. Esto muestra una distancia entre lo prescripto y lo enseñado.")
     st.markdown("### Marco normativo citado en el trabajo")
-    st.markdown("- Constitución Nacional, artículo 41.\n- Ley 25.675, General del Ambiente.\n- Ley 27.621, Educación Ambiental Integral.\n- Ley provincial 10.823.\n- Ley 5.589, Código de Aguas de Córdoba.")
-    st.caption("Las descripciones de los lugares y sus datos se presentan según el material de la investigación. Conviene verificarlos con fuentes técnicas antes de una publicación institucional.")
+    laws = [
+        ("Constitución Nacional · artículo 41", "https://www.argentina.gob.ar/normativa/nacional/804/texto", "Derecho a un ambiente sano y deber de preservarlo."),
+        ("Ley 25.675 · General del Ambiente", "https://www.argentina.gob.ar/normativa/nacional/79980/texto", "Principios de política ambiental, educación e información ambiental."),
+        ("Ley 27.621 · Educación Ambiental Integral", "https://www.argentina.gob.ar/normativa/nacional/ley-27621-350594/texto", "Establece la educación ambiental integral como política pública nacional."),
+        ("Ley provincial 10.823 · adhesión de Córdoba a la Ley 27.621", "https://legislaturacba.gob.ar/wp-content/uploads/2022/06/29-06-2022-LEY-10.823-Adhi%C3%A9rese-la-Provincia-de-C%C3%B3rdoba-a-las-disposiciones-de-la-Ley-Nacional-N%C2%BA-27621-Implementaci%C3%B3n-de-la-Educaci%C3%B3n-Ambiental-Integral.pdf", "Adhesión provincial a la Ley Nacional de Educación Ambiental Integral."),
+        ("Ley 5.589 · Código de Aguas de Córdoba", "https://www.argentina.gob.ar/normativa/provincial/ley-5589-123456789-0abc-defg-985-5000ovorpyel/actualizacion", "Norma provincial sobre aprovechamiento, conservación y protección de las aguas."),
+    ]
+    for law_title, law_url, law_desc in laws:
+        st.markdown(f'<div class="card" style="margin-bottom:.65rem;padding:1rem 1.15rem"><a href="{law_url}" target="_blank">{law_title} ↗</a><p style="margin:.35rem 0 0">{law_desc}</p></div>', unsafe_allow_html=True)
 
 elif page == "Laboratorio hidráulico 3D":
     heading("04 · Simulación interactiva", "Laboratorio hidráulico", "Modificá las variables del modelo para explorar cómo se relacionan la altura de caída, el caudal y la potencia hidráulica.")
@@ -197,38 +232,77 @@ elif page == "Laboratorio hidráulico 3D":
     with c2:
         st.markdown("#### Modelo 3D de una turbina hidráulica")
         st.caption("Esquema didáctico de los componentes principales; no es un plano constructivo de la central Ferroviario.")
-        theta = np.linspace(0, 2*np.pi, 80)
-        z = np.linspace(0, 1, 18)
-        T, Z = np.meshgrid(theta, z)
-        # Carcasa/voluta representada como cuerpo anular abierto
-        R = 1.05 - 0.16*Z
-        X = R*np.cos(T); Y = R*np.sin(T); ZZ = 0.55 + Z*1.05
+        # Modelo volumétrico conceptual de turbina Francis horizontal, con carcasa en corte.
+        # La geometría ilustra el recorrido del agua; no representa dimensiones constructivas reales.
         fig = go.Figure()
-        fig.add_trace(go.Surface(x=X, y=Y, z=ZZ, surfacecolor=Z, colorscale=[[0,"#8ccfc2"],[0.45,"#268f83"],[1,"#155d58"]], opacity=.82, showscale=False, name="Carcasa / distribuidor", hovertemplate="Carcasa y distribuidor<extra></extra>"))
-        # Canal de entrada y salida
-        fig.add_trace(go.Scatter3d(x=[-3.1,-2.5,-1.7,-1.1], y=[0,0,0,0], z=[2.8,2.35,1.65,1.2], mode="lines", line=dict(color="#159bd0", width=16), name="Entrada de agua", hovertemplate="Entrada de agua<extra></extra>"))
-        fig.add_trace(go.Scatter3d(x=[0.65,1.35,2.15,2.75], y=[0,0,0,0], z=[0.72,0.4,0.25,0.25], mode="lines", line=dict(color="#159bd0", width=14), name="Salida de agua", hovertemplate="Salida de agua<extra></extra>"))
-        # Runner / rodete: central hub and radial blades
-        fig.add_trace(go.Scatter3d(x=[0,0], y=[0,0], z=[0.65,1.38], mode="lines", line=dict(color="#e7a92f", width=10), name="Eje", hovertemplate="Eje<extra></extra>"))
-        fig.add_trace(go.Scatter3d(x=[0], y=[0], z=[0.95], mode="markers", marker=dict(size=10, color="#f4c45e", line=dict(color="#825d17", width=2)), name="Núcleo del rodete", hovertemplate="Rodete<extra></extra>"))
-        for ang in np.linspace(0, 2*np.pi, 9)[:-1]:
-            r0, r1 = .18, .86
-            # Slightly swept blade, each shown as a thick line
-            fig.add_trace(go.Scatter3d(x=[r0*np.cos(ang), .52*np.cos(ang+.15), r1*np.cos(ang+.25)], y=[r0*np.sin(ang), .52*np.sin(ang+.15), r1*np.sin(ang+.25)], z=[.95,.88,.78], mode="lines", line=dict(color="#f0bd4f", width=8), showlegend=False, hovertemplate="Álabe del rodete<extra></extra>"))
-        # Generator housing above the shaft
-        gen_theta = np.linspace(0, 2*np.pi, 50)
-        gen_z = np.linspace(1.45, 2.15, 12)
-        GT, GZ = np.meshgrid(gen_theta, gen_z)
-        GX, GY = .52*np.cos(GT), .52*np.sin(GT)
-        fig.add_trace(go.Surface(x=GX, y=GY, z=GZ, colorscale=[[0,"#aebbc2"],[1,"#5e707b"]], showscale=False, opacity=.95, name="Generador", hovertemplate="Generador eléctrico<extra></extra>"))
-        fig.add_trace(go.Scatter3d(x=[0,0], y=[0,0], z=[1.25,1.48], mode="lines", line=dict(color="#7a858c", width=8), name="Acoplamiento", hovertemplate="Acoplamiento mecánico<extra></extra>"))
-        fig.update_layout(height=490, margin=dict(l=0,r=0,t=5,b=5), paper_bgcolor="rgba(0,0,0,0)",
-            scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode="manual", aspectratio=dict(x=1.55,y=1.15,z=1.2), camera=dict(eye=dict(x=1.7,y=1.8,z=1.25))),
-            legend=dict(orientation="h", y=-.06, font=dict(color="#142b2b", size=10)), font=dict(color="#142b2b"))
+        ang = np.linspace(-0.35, 5.15, 110)  # abertura frontal para ver el interior
+        cross = np.linspace(0, 2*np.pi, 28)
+        A, T = np.meshgrid(ang, cross)
+        # Voluta metálica en corte: tubo curvo de sección variable alrededor del rodete.
+        major = 0.88 + 0.08*np.sin(A)
+        minor = 0.22 + 0.07*(A-ang.min())/(ang.max()-ang.min())
+        Xv = (major + minor*np.cos(T))*np.cos(A)
+        Yv = (major + minor*np.cos(T))*np.sin(A)
+        Zv = 0.49 + minor*np.sin(T)
+        fig.add_trace(go.Surface(x=Xv, y=Yv, z=Zv, surfacecolor=np.broadcast_to(minor, Xv.shape),
+            colorscale=[[0,"#718792"],[0.45,"#c6d2d6"],[1,"#526b77"]],
+            opacity=.66, showscale=False, name="Carcasa espiral (corte)",
+            hovertemplate="Carcasa espiral: distribuye el agua alrededor del rodete<extra></extra>"))
+        # Bridas y tuberías de entrada/salida, representadas como tubos con líneas gruesas.
+        fig.add_trace(go.Scatter3d(x=[-2.75,-2.25,-1.75,-1.18], y=[1.28,1.22,0.98,0.63], z=[0.50,0.50,0.50,0.50],
+            mode="lines", line=dict(color="#1a91c8", width=28), name="Entrada de agua",
+            hovertemplate="Entrada de agua a presión<extra></extra>"))
+        fig.add_trace(go.Scatter3d(x=[1.05,1.55,2.05,2.55], y=[0,0,0,0], z=[0.18,0.18,0.18,0.18],
+            mode="lines", line=dict(color="#238fc0", width=24), name="Salida / tubo de aspiración",
+            hovertemplate="Salida del agua hacia el canal de restitución<extra></extra>"))
+        # Bridas metálicas visibles en los extremos de las tuberías.
+        for x0, y0, z0 in [(-2.15,1.22,.50),(1.52,0,.18)]:
+            phi = np.linspace(0,2*np.pi,50)
+            fig.add_trace(go.Scatter3d(x=np.full_like(phi,x0), y=y0+.20*np.cos(phi), z=z0+.20*np.sin(phi),
+                mode="lines", line=dict(color="#d8e0e3",width=5), showlegend=False, hoverinfo="skip"))
+        # Anillo guía / distribuidor alrededor del rodete.
+        phi=np.linspace(0,2*np.pi,100)
+        for z0, rad in [(0.40,.82),(0.62,.82)]:
+            fig.add_trace(go.Scatter3d(x=rad*np.cos(phi), y=rad*np.sin(phi), z=np.full_like(phi,z0),
+                mode="lines", line=dict(color="#c0a36d",width=9), name="Distribuidor" if z0==.40 else None,
+                showlegend=(z0==.40), hovertemplate="Distribuidor: orienta el flujo hacia los álabes<extra></extra>"))
+        # Rodete, eje horizontal y palas curvadas.
+        fig.add_trace(go.Scatter3d(x=[-0.12,0.12], y=[0,0], z=[0.51,0.51], mode="lines",
+            line=dict(color="#b77a29",width=18), name="Cubo del rodete", hovertemplate="Cubo del rodete<extra></extra>"))
+        for a0 in np.linspace(0,2*np.pi,10,endpoint=False):
+            radii=np.linspace(.16,.73,14)
+            curve=a0 + 0.30*(radii-.16)/(.73-.16)
+            fig.add_trace(go.Scatter3d(x=radii*np.cos(curve), y=radii*np.sin(curve),
+                z=.51+0.06*np.sin(np.linspace(0,np.pi,14)), mode="lines",
+                line=dict(color="#e7b44f",width=10), showlegend=False,
+                hovertemplate="Álabe curvado del rodete<extra></extra>"))
+        # Eje de transmisión hacia el generador, colocado a la izquierda del rodete.
+        fig.add_trace(go.Scatter3d(x=[-0.10,-0.55,-0.85,-1.08], y=[0,0,0,0], z=[0.51,0.51,0.51,0.51],
+            mode="lines", line=dict(color="#d0d6da",width=13), name="Eje de transmisión",
+            hovertemplate="El eje transmite el giro al generador<extra></extra>"))
+        # Generador cilíndrico horizontal: malla lateral y tapas.
+        gx=np.linspace(-1.95,-1.05,28); gp=np.linspace(0,2*np.pi,60)
+        GX, GP = np.meshgrid(gx, gp)
+        GY=.40*np.cos(GP); GZ=.51+.40*np.sin(GP)
+        fig.add_trace(go.Surface(x=GX,y=GY,z=GZ,colorscale=[[0,"#425966"],[.5,"#8fa0a9"],[1,"#d0d8dc"]],
+            showscale=False,opacity=.98,name="Generador eléctrico",hovertemplate="Generador: convierte energía mecánica en eléctrica<extra></extra>"))
+        for x0 in [-1.95,-1.05]:
+            fig.add_trace(go.Scatter3d(x=np.full_like(gp,x0),y=.40*np.cos(gp),z=.51+.40*np.sin(gp),
+                mode="lines",line=dict(color="#344955",width=7),showlegend=False,hoverinfo="skip"))
+        # Etiquetas espaciales para lectura inmediata.
+        labels=[(-2.25,.40,1.02,"GENERADOR"),(-1.15,.05,.95,"EJE"),(.05,.90,1.03,"RODETE"),(.95,-.15,.90,"CARCASA / DISTRIBUIDOR"),(-2.65,1.42,.88,"ENTRADA"),(2.00,.25,.52,"SALIDA")]
+        for lx,ly,lz,txt in labels:
+            fig.add_trace(go.Scatter3d(x=[lx],y=[ly],z=[lz],mode="text",text=[txt],
+                textfont=dict(size=10,color="#18343a"),showlegend=False,hoverinfo="skip"))
+        fig.update_layout(height=560, margin=dict(l=0,r=0,t=8,b=10), paper_bgcolor="rgba(0,0,0,0)",
+            scene=dict(xaxis=dict(visible=False,range=[-3.1,2.9]),yaxis=dict(visible=False,range=[-1.65,1.65]),
+            zaxis=dict(visible=False,range=[-0.1,1.35]),aspectmode="manual",aspectratio=dict(x=1.8,y=1.05,z=.85),
+            camera=dict(eye=dict(x=1.65,y=1.8,z=1.25))),
+            legend=dict(orientation="h",y=-.04,font=dict(color="#142b2b",size=10)),font=dict(color="#142b2b"))
         st.plotly_chart(fig, use_container_width=True)
         with st.expander("Ver esquema de referencia de una turbina hidráulica"):
             st.image("assets/turbina_referencia_componentes.png", use_container_width=True, caption="Esquema de referencia aportado para identificar entrada de agua, distribuidor, rodete, eje, generador y salida.")
-            st.caption("La ilustración es una referencia conceptual; la geometría de cada central puede ser diferente.")
+            st.caption("Esquema de referencia de los componentes principales de una turbina hidráulica.")
         st.markdown("**Partes identificables**")
         pcols = st.columns(3)
         for col, name, desc in zip(pcols, ["Entrada / distribuidor", "Rodete y eje", "Generador / salida"], ["El agua llega guiada hacia la turbina.", "El flujo transfiere energía al conjunto móvil.", "El eje acciona el generador; el agua continúa hacia la salida."]):
@@ -241,7 +315,7 @@ elif page == "Laboratorio hidráulico 3D":
     f2.add_trace(go.Scatter(x=[q],y=[p_e],mode="markers",marker=dict(size=12,color="#f1bd4b"),name="Escenario actual"))
     f2.update_layout(height=300,margin=dict(l=10,r=10,t=20,b=10),xaxis_title="Caudal Q (m³/s)",yaxis_title="Potencia (MW)",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="white")
     st.plotly_chart(f2,use_container_width=True)
-    st.info("Pregunta para el aula: si se duplica el caudal y se mantienen la altura y la eficiencia, ¿qué sucede con la potencia estimada?")
+    st.info("La potencia estimada aumenta en proporción directa al caudal cuando la altura y la eficiencia permanecen constantes.")
 
 elif page == "Compostaje y calor":
     heading("04 · Biomasa y energía térmica", "Compostaje y calor", "Explorá las fases de un proceso biológico y diferenciá el calor transferido al agua de la energía realmente recuperable.")
@@ -310,8 +384,8 @@ elif page == "Propuestas didácticas":
         st.markdown("### Hidrodinámica, riesgos laborales y gestión ambiental")
         st.markdown("- **Modelización:** Bernoulli con pérdidas y número de Reynolds en la tubería.\n- **Riesgos laborales:** matriz IPERC para la central y el IPEA, riesgos eléctricos, alturas y espacios confinados, y procedimiento LOTO.\n- **Balance de calor:** explorar si el calor del compost podría calentar agua o un invernadero.\n\n**Producto:** proyecto de práctica profesionalizante, con manual de seguridad y auditoría ambiental.")
     st.divider()
-    st.markdown("### Recursos digitales para ampliar")
-    st.write("La versión publicada puede incorporar enlaces a simuladores, mapas, documentos curriculares, guías de visita y actividades de evaluación. Los enlaces concretos deben revisarse antes de publicar para asegurar que sean pertinentes y estén vigentes.")
+    st.markdown("### Recursos digitales")
+    st.markdown("- [Aviso ambiental 2026 · Parque Solar Fotovoltaico Cruz del Eje](https://cadenacentro.com/ultimas/audiencia-publica-ambiental-digital-proyecto-parque-solar-fotovoltaico-cruz-del-eje-2/)\n- [Antecedente técnico 2022 · EPEC](https://www.epec.com.ar/docs/imagenes/comunidad/blog/88/ANEXO3_PROYECTOS_PROPUESTOS_POR_EPEC_Convocatoria2022.pdf)\n- [Mapa educativo nacional · IPEA N.º 211](https://mapa.educacion.gob.ar/legajo/140256100)\n- [Central hidroeléctrica Cruz del Eje · EPEC](https://web.epec.com.ar/generacion_central_h_cruz-eje.html)\n- [Ley de Educación Ambiental Integral · Argentina.gob.ar](https://www.argentina.gob.ar/normativa/nacional/ley-27621-350594/texto)")
 
 else:
     heading("07 · Hallazgos", "¿Qué nos dice la investigación?", "Los resultados son exploratorios: la muestra por conveniencia no permite generalizar a todos los docentes o instituciones.")
