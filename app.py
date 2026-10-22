@@ -9,6 +9,16 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 :root { --ink:#142b2b; --muted:#55706b; --green:#146b55; --lime:#c9f36b; --paper:#f5f7f1; }
 html, body, [class*="css"] { font-family:'DM Sans',sans-serif; }
+/* Contraste accesible para controles y datos */
+.stApp, [data-testid="stAppViewContainer"] { color:#142b2b !important; }
+.stMarkdown, .stMarkdown p, .stMarkdown li, label, [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p { color:#142b2b !important; }
+[data-testid="stSlider"] label, [data-testid="stNumberInput"] label, [data-testid="stSelectbox"] label { color:#142b2b !important; font-weight:700 !important; }
+[data-testid="stSlider"] [data-testid="stTickBar"] + div, [data-testid="stSlider"] [data-testid="stThumbValue"] { color:#142b2b !important; }
+[data-testid="stNumberInput"] input, [data-testid="stTextInput"] input { color:#142b2b !important; background:#ffffff !important; }
+[data-testid="stMetricValue"] { color:#146b55 !important; }
+.stButton button, .stLinkButton a { border-radius:12px !important; font-weight:700 !important; }
+.nav-note { color:#55706b; font-size:.9rem; }
+[data-testid="stPlotlyChart"] { border-radius:14px; overflow:hidden; }
 .stApp { background:var(--paper); color:var(--ink); }
 [data-testid="stSidebar"] { background:#102f2d; }
 [data-testid="stSidebar"] * { color:#f4f7ed !important; }
@@ -32,7 +42,10 @@ footer {visibility:hidden;}
 with st.sidebar:
     st.markdown("## ⚡ Energía renovable")
     st.caption("Investigación educativa · Cruz del Eje")
-    page = st.radio("RECORRIDO", ["Inicio", "La investigación", "Mapa energético local", "Cruz del Eje", "Registro de campo", "Laboratorio hidráulico 3D", "Compostaje y calor", "Propuestas didácticas", "Resultados y conclusiones"], label_visibility="collapsed")
+    pages = ["Inicio", "La investigación", "Mapa energético local", "Cruz del Eje", "Registro de campo", "Laboratorio hidráulico 3D", "Compostaje y calor", "Propuestas didácticas", "Resultados y conclusiones"]
+    def set_page(target):
+        st.session_state["nav_page"] = target
+    page = st.radio("RECORRIDO", pages, label_visibility="collapsed", key="nav_page")
     st.divider()
     st.markdown("**Profesorado Universitario de Física**")
     st.caption("UPC · Sede Cruz del Eje · 2026")
@@ -69,6 +82,11 @@ if page == "Inicio":
     items=[("01 · Investigación","Pregunta, objetivos, marco teórico y método."),("02 · Territorio","Mapa energético local y recursos del caso."),("03 · Laboratorios","Exploraciones interactivas de potencia hidráulica y calor.")]
     for c,(t,d) in zip(cols,items):
         with c: st.markdown(f'<div class="card"><div class="kicker">Explorar</div><h3>{t}</h3><p>{d}</p></div>',unsafe_allow_html=True)
+    st.markdown("### Ir directamente a una sección")
+    jump_cols = st.columns(3)
+    for col, label, target in zip(jump_cols, ["Ver el mapa local", "Abrir laboratorio hidráulico", "Explorar compostaje y calor"], ["Mapa energético local", "Laboratorio hidráulico 3D", "Compostaje y calor"]):
+        with col:
+            st.button(label, use_container_width=True, on_click=set_page, args=(target,))
 
 elif page == "La investigación":
     heading("01 · El proyecto", "¿Cómo se enseñan las energías renovables?", "La investigación compara lo que prescriben los documentos, lo que declaran los docentes y el conocimiento físico del potencial energético local.")
@@ -100,14 +118,14 @@ elif page == "Mapa energético local":
         {"Lugar":"IPEA N.º 211 Presidente Arturo Illia", "Latitud":-30.74969, "Longitud":-64.73899, "Tipo":"Biomasa y educación", "Detalle":"Caso escolar de compost, bokashi y lombricompuesto."},
     ])
     figmap = go.Figure()
-    figmap.add_trace(go.Scattermapbox(
+    figmap.add_trace(go.Scattermap(
         lat=locations["Latitud"], lon=locations["Longitud"], mode="markers+text",
         text=["Dique Arturo Illia", "IPEA N.º 211"], textposition="top right",
         marker=dict(size=[18,15], color=["#167d72", "#d6a73b"]),
         customdata=locations[["Tipo", "Detalle"]].values,
         hovertemplate="<b>%{text}</b><br>%{customdata[0]}<br>%{customdata[1]}<extra></extra>"
     ))
-    figmap.update_layout(mapbox=dict(style="open-street-map", center=dict(lat=-30.756, lon=-64.746), zoom=12),
+    figmap.update_layout(map=dict(style="open-street-map", center=dict(lat=-30.756, lon=-64.746), zoom=12),
                          height=510, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor="rgba(0,0,0,0)",
                          legend=dict(orientation="h"))
     st.plotly_chart(figmap, use_container_width=True)
@@ -177,22 +195,45 @@ elif page == "Laboratorio hidráulico 3D":
         st.metric("Potencia eléctrica estimada",f"{p_e:.3f} MW",help="Potencia hidráulica multiplicada por la eficiencia supuesta.")
         st.caption("El valor de eficiencia es un supuesto modificable para fines didácticos.")
     with c2:
-        # A stylized 3D schematic: water channel, penstock and turbine wheel.
-        theta=np.linspace(0,2*np.pi,80)
-        z=np.linspace(0,1,14)
-        T,Z=np.meshgrid(theta,z)
-        R=0.8
-        X=R*np.cos(T); Y=R*np.sin(T); ZZ=Z*1.3
-        fig=go.Figure()
-        fig.add_trace(go.Surface(x=X,y=Y,z=ZZ,opacity=.75,showscale=False,colorscale=[[0,"#b6e3d4"],[1,"#176b59"]],name="Turbina esquemática"))
-        # central shaft
-        fig.add_trace(go.Scatter3d(x=[0,0],y=[0,0],z=[-0.2,1.7],mode="lines",line=dict(color="#f1bd4b",width=8),name="Eje"))
-        # water pipe line to turbine
-        fig.add_trace(go.Scatter3d(x=[-2.8,-2.1,-1.2,-.8],y=[0,0,0,0],z=[2.4,2.0,1.3,.8],mode="lines",line=dict(color="#58a9e0",width=12),name="Conducto de agua"))
-        for ang in np.linspace(0,2*np.pi,7)[:-1]:
-            fig.add_trace(go.Scatter3d(x=[0,0.78*np.cos(ang)],y=[0,0.78*np.sin(ang)],z=[.65,.65],mode="lines",line=dict(color="#f1bd4b",width=5),showlegend=False,hoverinfo="skip"))
-        fig.update_layout(height=430,margin=dict(l=0,r=0,t=5,b=0),paper_bgcolor="rgba(0,0,0,0)",scene=dict(xaxis=dict(visible=False),yaxis=dict(visible=False),zaxis=dict(visible=False),aspectmode="data",camera=dict(eye=dict(x=1.8,y=1.7,z=1.25))),legend=dict(orientation="h",y=-.04))
-        st.plotly_chart(fig,use_container_width=True)
+        st.markdown("#### Modelo 3D de una turbina hidráulica")
+        st.caption("Esquema didáctico de los componentes principales; no es un plano constructivo de la central Ferroviario.")
+        theta = np.linspace(0, 2*np.pi, 80)
+        z = np.linspace(0, 1, 18)
+        T, Z = np.meshgrid(theta, z)
+        # Carcasa/voluta representada como cuerpo anular abierto
+        R = 1.05 - 0.16*Z
+        X = R*np.cos(T); Y = R*np.sin(T); ZZ = 0.55 + Z*1.05
+        fig = go.Figure()
+        fig.add_trace(go.Surface(x=X, y=Y, z=ZZ, surfacecolor=Z, colorscale=[[0,"#8ccfc2"],[0.45,"#268f83"],[1,"#155d58"]], opacity=.82, showscale=False, name="Carcasa / distribuidor", hovertemplate="Carcasa y distribuidor<extra></extra>"))
+        # Canal de entrada y salida
+        fig.add_trace(go.Scatter3d(x=[-3.1,-2.5,-1.7,-1.1], y=[0,0,0,0], z=[2.8,2.35,1.65,1.2], mode="lines", line=dict(color="#159bd0", width=16), name="Entrada de agua", hovertemplate="Entrada de agua<extra></extra>"))
+        fig.add_trace(go.Scatter3d(x=[0.65,1.35,2.15,2.75], y=[0,0,0,0], z=[0.72,0.4,0.25,0.25], mode="lines", line=dict(color="#159bd0", width=14), name="Salida de agua", hovertemplate="Salida de agua<extra></extra>"))
+        # Runner / rodete: central hub and radial blades
+        fig.add_trace(go.Scatter3d(x=[0,0], y=[0,0], z=[0.65,1.38], mode="lines", line=dict(color="#e7a92f", width=10), name="Eje", hovertemplate="Eje<extra></extra>"))
+        fig.add_trace(go.Scatter3d(x=[0], y=[0], z=[0.95], mode="markers", marker=dict(size=10, color="#f4c45e", line=dict(color="#825d17", width=2)), name="Núcleo del rodete", hovertemplate="Rodete<extra></extra>"))
+        for ang in np.linspace(0, 2*np.pi, 9)[:-1]:
+            r0, r1 = .18, .86
+            # Slightly swept blade, each shown as a thick line
+            fig.add_trace(go.Scatter3d(x=[r0*np.cos(ang), .52*np.cos(ang+.15), r1*np.cos(ang+.25)], y=[r0*np.sin(ang), .52*np.sin(ang+.15), r1*np.sin(ang+.25)], z=[.95,.88,.78], mode="lines", line=dict(color="#f0bd4f", width=8), showlegend=False, hovertemplate="Álabe del rodete<extra></extra>"))
+        # Generator housing above the shaft
+        gen_theta = np.linspace(0, 2*np.pi, 50)
+        gen_z = np.linspace(1.45, 2.15, 12)
+        GT, GZ = np.meshgrid(gen_theta, gen_z)
+        GX, GY = .52*np.cos(GT), .52*np.sin(GT)
+        fig.add_trace(go.Surface(x=GX, y=GY, z=GZ, colorscale=[[0,"#aebbc2"],[1,"#5e707b"]], showscale=False, opacity=.95, name="Generador", hovertemplate="Generador eléctrico<extra></extra>"))
+        fig.add_trace(go.Scatter3d(x=[0,0], y=[0,0], z=[1.25,1.48], mode="lines", line=dict(color="#7a858c", width=8), name="Acoplamiento", hovertemplate="Acoplamiento mecánico<extra></extra>"))
+        fig.update_layout(height=490, margin=dict(l=0,r=0,t=5,b=5), paper_bgcolor="rgba(0,0,0,0)",
+            scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode="manual", aspectratio=dict(x=1.55,y=1.15,z=1.2), camera=dict(eye=dict(x=1.7,y=1.8,z=1.25))),
+            legend=dict(orientation="h", y=-.06, font=dict(color="#142b2b", size=10)), font=dict(color="#142b2b"))
+        st.plotly_chart(fig, use_container_width=True)
+        with st.expander("Ver esquema de referencia de una turbina hidráulica"):
+            st.image("assets/turbina_referencia_componentes.png", use_container_width=True, caption="Esquema de referencia aportado para identificar entrada de agua, distribuidor, rodete, eje, generador y salida.")
+            st.caption("La ilustración es una referencia conceptual; la geometría de cada central puede ser diferente.")
+        st.markdown("**Partes identificables**")
+        pcols = st.columns(3)
+        for col, name, desc in zip(pcols, ["Entrada / distribuidor", "Rodete y eje", "Generador / salida"], ["El agua llega guiada hacia la turbina.", "El flujo transfiere energía al conjunto móvil.", "El eje acciona el generador; el agua continúa hacia la salida."]):
+            with col:
+                st.markdown(f'<div class="card"><h3 style="font-size:1rem">{name}</h3><p style="font-size:.88rem">{desc}</p></div>', unsafe_allow_html=True)
     st.markdown("#### Explorá el resultado")
     xs=np.linspace(.1,4,50)
     ys=rho*g*xs*h*eff/100/1e6
@@ -226,6 +267,8 @@ elif page == "Compostaje y calor":
     for c,(title,desc,time) in zip(cols,data):
         with c: st.markdown(f'<div class="card"><div class="kicker">{time}</div><h3>{title}</h3><p>{desc}</p></div>',unsafe_allow_html=True)
     st.caption("Los tiempos son los consignados en el material de investigación y pueden variar según las condiciones de proceso.")
+    st.link_button("Abrir la aplicación de compostaje del IPEA", "https://manejo-de-variables-compost-upc-fisica.streamlit.app/", use_container_width=True)
+    st.caption("La aplicación enlazada es un recurso complementario independiente; se abre en otra pestaña o ventana según el navegador.")
     st.divider()
     st.markdown("### Explorador conceptual de fases")
     st.write("La curva siguiente es un esquema didáctico, no una serie de mediciones del IPEA. Sirve para relacionar el tiempo transcurrido con las fases habituales mencionadas en la presentación.")
@@ -287,4 +330,15 @@ else:
     st.markdown("- La muestra por conveniencia no permite generalizar.\n- Se analizan prácticas declaradas, no observadas.\n- El nivel superior está representado por una sola docente.\n- Las propuestas deben validarse con docentes y la página web debe probarse en una escuela.\n- Próximos pasos: ampliar la muestra y desarrollar guías de actividades por nivel.")
 
 st.divider()
+# Navegación secuencial: mantiene el menú lateral y añade un recorrido con flechas.
+current_index = pages.index(page)
+nav_left, nav_mid, nav_right = st.columns([1, 2, 1])
+with nav_left:
+    if current_index > 0:
+        st.button("← Anterior", use_container_width=True, on_click=set_page, args=(pages[current_index - 1],))
+with nav_mid:
+    st.markdown(f'<div class="nav-note" style="text-align:center;padding-top:.55rem">Sección {current_index + 1} de {len(pages)} · {page}</div>', unsafe_allow_html=True)
+with nav_right:
+    if current_index < len(pages) - 1:
+        st.button("Siguiente →", use_container_width=True, type="primary", on_click=set_page, args=(pages[current_index + 1],))
 st.markdown("<div style='display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;color:#60756d;font-size:.85rem'><span>La energía renovable como contenido escolar</span><span>Profesorado Universitario de Física · UPC · 2026</span></div>",unsafe_allow_html=True)
