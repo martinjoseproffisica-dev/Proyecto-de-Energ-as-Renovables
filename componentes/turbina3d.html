@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{
+  --bg:#F5F7F1; --surface:#FFFFFF; --ink:#142B2B; --muted:#55706B; --primary:#146B55;
+  --primaryInk:#FFFFFF; --border:#E1E9DF; --accent:#C9F36B; --warn:#D9822B;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent;color:var(--ink);
+  font-family:"DM Sans","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;font-size:14px}
+#app{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;height:100vh;min-height:620px}
+#stage{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--border);min-height:420px}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.mk{position:absolute;left:0;top:0;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;
+  background:var(--primary);color:var(--primaryInk);font-weight:700;font-size:13px;display:flex;align-items:center;
+  justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);pointer-events:auto;cursor:pointer;
+  transition:transform .12s, background .12s}
+.mk:hover{transform:scale(1.18)}
+.mk.sel{background:var(--warn);color:#fff}
+.mk .tip{position:absolute;left:32px;top:50%;transform:translateY(-50%);white-space:nowrap;background:rgba(10,20,20,.86);
+  color:#fff;font-weight:600;font-size:12px;padding:3px 8px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .12s}
+.mk:hover .tip,.mk.sel .tip{opacity:1}
+#legend{position:absolute;left:12px;top:12px;background:rgba(10,20,20,.62);color:#fff;border-radius:12px;padding:8px 10px;
+  font-size:12px;line-height:1.35;max-width:300px;backdrop-filter:blur(3px)}
+#legend .grad{height:8px;border-radius:6px;margin:5px 0 3px;background:linear-gradient(90deg,#1e63c8,#29b6f6 55%,#e1f5fe)}
+#legend .ends{display:flex;justify-content:space-between;gap:14px;font-size:11px;opacity:.92}
+#toolbar{position:absolute;left:10px;right:10px;bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;
+  font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit}
+.chip.on{background:var(--primary);color:var(--primaryInk);border-color:var(--primary)}
+.exp{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;
+  padding:5px 12px;font-weight:600;font-size:12.5px;color:var(--ink)}
+.exp input{width:120px;accent-color:var(--primary)}
+#status{position:absolute;right:12px;top:12px;background:rgba(10,20,20,.62);color:#fff;border-radius:12px;padding:8px 10px;font-size:12px;text-align:right}
+#nogl{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--ink);background:var(--surface)}
+#panel{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px 16px;overflow:auto}
+#panel h3{margin:0 0 8px;font-size:15px;letter-spacing:.01em}
+#panel h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--primary)}
+.row{margin:8px 0}
+.row label{display:flex;justify-content:space-between;font-weight:600;font-size:13px}
+.row label b{color:var(--primary);font-variant-numeric:tabular-nums}
+.row input[type=range]{width:100%;accent-color:var(--primary)}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kv{border:1px solid var(--border);border-radius:12px;padding:7px 10px;background:var(--bg)}
+.kv span{display:block;font-size:11px;color:var(--muted);line-height:1.25}
+.kv b{font-size:17px;font-variant-numeric:tabular-nums}
+.kv.hl{background:var(--primary);border-color:var(--primary)}
+.kv.hl span,.kv.hl b{color:var(--primaryInk)}
+.bar{display:flex;height:16px;border-radius:9px;overflow:hidden;margin-top:6px;border:1px solid var(--border)}
+.bar i{display:block;height:100%}
+.bar .u{background:var(--primary)}
+.bar .l{background:repeating-linear-gradient(45deg,var(--warn),var(--warn) 5px,#f0b266 5px,#f0b266 10px)}
+.barl{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:4px}
+#chart{width:100%;height:auto;border:1px solid var(--border);border-radius:12px;background:var(--bg)}
+ol#parts{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:5px}
+ol#parts li{display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:10px;padding:5px 8px;cursor:pointer;
+  font-size:12.5px;font-weight:600;background:var(--bg)}
+ol#parts li span{width:20px;height:20px;border-radius:50%;background:var(--primary);color:var(--primaryInk);font-size:11px;
+  display:flex;align-items:center;justify-content:center;flex:none}
+ol#parts li.sel{border-color:var(--warn);background:var(--surface);box-shadow:0 0 0 1px var(--warn) inset}
+ol#parts li.sel span{background:var(--warn)}
+#pdesc{margin-top:8px;font-size:13px;line-height:1.45;border-left:4px solid var(--primary);padding:6px 10px;background:var(--bg);border-radius:0 10px 10px 0;min-height:64px}
+.note{font-size:11.5px;color:var(--muted);line-height:1.4;margin:10px 0 0}
+@media (max-width:900px){#app{grid-template-columns:1fr;height:auto}#stage{height:460px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="stage">
+    <canvas id="gl"></canvas>
+    <div id="labels"></div>
+    <div id="legend">
+      <b>Recorrido del agua</b>
+      <div class="grad"></div>
+      <div class="ends"><span>mucha energía</span><span>ya cedió su energía</span></div>
+    </div>
+    <div id="status"><div id="stOpen"></div><div id="stRot"></div></div>
+    <div id="toolbar">
+      <button class="chip on" id="bCut">Vista en corte</button>
+      <button class="chip on" id="bFlow">Flujo de agua</button>
+      <button class="chip" id="bSpin">Girar escena</button>
+      <button class="chip" id="bReset">Restablecer vista</button>
+      <label class="exp">Explosionar <input type="range" id="sExp" min="0" max="100" value="0" aria-label="Vista explosionada"></label>
+    </div>
+    <div id="nogl"><div><b>No se pudo iniciar el modelo 3D.</b><br>El navegador no tiene WebGL disponible o la librería no se descargó. Probá recargar la página; los controles de la derecha siguen funcionando.</div></div>
+  </section>
+  <aside id="panel">
+    <h3>Variables del modelo</h3>
+    <div class="row"><label>Altura neta H <b id="vH"></b></label><input type="range" id="sH" min="1" max="40" step="0.5"></div>
+    <div class="row"><label>Caudal Q <b id="vQ"></b></label><input type="range" id="sQ" min="0.1" max="4" step="0.1"></div>
+    <div class="row"><label>Eficiencia global <b id="vE"></b></label><input type="range" id="sE" min="20" max="95" step="1"></div>
+    <div class="cards">
+      <div class="kv"><span>Potencia hidráulica</span><b id="oPh"></b></div>
+      <div class="kv hl"><span>Potencia eléctrica</span><b id="oPe"></b></div>
+      <div class="kv"><span>Energía en 1 hora</span><b id="oEn"></b></div>
+      <div class="kv"><span>Presión estática (H)</span><b id="oPr"></b></div>
+    </div>
+    <h4>¿Adónde va la potencia?</h4>
+    <div class="bar"><i class="u" id="bU"></i><i class="l" id="bL"></i></div>
+    <div class="barl"><span id="lU"></span><span id="lL"></span></div>
+    <h4>Potencia eléctrica según el caudal</h4>
+    <canvas id="chart" width="640" height="300"></canvas>
+    <h4>Partes de la turbina</h4>
+    <ol id="parts"></ol>
+    <div id="pdesc">Tocá un número del modelo o de esta lista para ver qué hace cada pieza.</div>
+    <p class="note">Esquema didáctico de una turbina de reacción tipo Francis con eje vertical. Sirve para entender cómo se transforma la energía; no reproduce la turbina ni las dimensiones de la central «El Ferroviario». Las potencias salen de P = ρ·g·Q·H·η.</p>
+  </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+"use strict";
+const CFG = __CONFIG__;           // { css:{...}, scene:{top,bottom,grid}, defaults:{H,Q,eff} }
+const css = document.documentElement.style;
+Object.keys(CFG.css).forEach(function (k) { css.setProperty("--" + k, CFG.css[k]); });
+const $ = function (id) { return document.getElementById(id); };
+const fmt = function (v, d) { return v.toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d }); };
+
+/* ---------- estado y física ---------- */
+const S = { H: CFG.defaults.H, Q: CFG.defaults.Q, eff: CFG.defaults.eff, cut: true, flow: true, spin: false, explode: 0, sel: -1 };
+const RHO = 1000, G = 9.81, QMAX = 4.0, QMIN = 0.1;
+function powers() {
+  const ph = RHO * G * S.Q * S.H / 1e6;   // MW
+  return { ph: ph, pe: ph * S.eff / 100 };
+}
+function opening() { return Math.min(1, Math.max(0, (S.Q - QMIN) / (QMAX - QMIN))); }
+
+const PARTS = [
+  { n: "Tubería forzada", d: "Lleva el agua desde la toma hasta la turbina. Allí la energía potencial del agua (la altura H) se convierte en presión: cada metro de altura equivale a unos 9,8 kPa." },
+  { n: "Caja espiral", d: "Su sección va achicándose para repartir el caudal de forma pareja alrededor de todo el rodete. Por eso tiene forma de caracol." },
+  { n: "Palas fijas y tapa", d: "Las palas fijas guían el agua hacia el distribuidor y le dan rigidez a la caja espiral; no se mueven. La tapa cierra la turbina por arriba y sostiene el cojinete del eje." },
+  { n: "Distribuidor", d: "Sus palas directrices giran y regulan el caudal: más abiertas, entra más agua y sube la potencia. Cerradas, la máquina se detiene. Movelas con el control de caudal." },
+  { n: "Rodete", d: "El agua empuja los álabes y los hace girar: la energía hidráulica se transforma en energía mecánica de rotación. El agua sale casi sin velocidad por el centro, hacia abajo." },
+  { n: "Eje", d: "Transmite el giro del rodete al rotor del generador. En una central conectada a la red gira siempre a la misma velocidad (sincronismo)." },
+  { n: "Generador", d: "El rotor, con sus polos magnéticos, gira dentro del estator. El flujo magnético variable induce una tensión (ley de Faraday-Lenz): la energía mecánica pasa a ser energía eléctrica." },
+  { n: "Tubo de aspiración", d: "Conduce el agua hacia el canal de salida y, al ensancharse, la frena y recupera parte de su energía. Así el agua deja la turbina con poca velocidad." }
+];
+
+/* ---------- panel lateral ---------- */
+function setupPanel() {
+  $("sH").value = S.H; $("sQ").value = S.Q; $("sE").value = S.eff;
+  ["sH", "sQ", "sE"].forEach(function (id) {
+    $(id).addEventListener("input", function () {
+      S.H = parseFloat($("sH").value); S.Q = parseFloat($("sQ").value); S.eff = parseFloat($("sE").value); refresh();
+    });
+  });
+  const ol = $("parts");
+  PARTS.forEach(function (p, i) {
+    const li = document.createElement("li");
+    li.innerHTML = "<span>" + (i + 1) + "</span>" + p.n;
+    li.addEventListener("click", function () { select(S.sel === i ? -1 : i); });
+    ol.appendChild(li);
+  });
+}
+function refresh() {
+  const p = powers();
+  $("vH").textContent = fmt(S.H, 1) + " m";
+  $("vQ").textContent = fmt(S.Q, 1) + " m³/s";
+  $("vE").textContent = S.eff + " %";
+  $("oPh").textContent = fmt(p.ph, 3) + " MW";
+  $("oPe").textContent = fmt(p.pe, 3) + " MW";
+  $("oEn").textContent = fmt(p.pe * 1000, 0) + " kWh";
+  $("oPr").textContent = fmt(RHO * G * S.H / 1e5, 2) + " bar";
+  $("bU").style.width = S.eff + "%"; $("bL").style.width = (100 - S.eff) + "%";
+  $("lU").textContent = "Útil: " + fmt(p.pe, 3) + " MW";
+  $("lL").textContent = "Pérdidas: " + fmt(p.ph - p.pe, 3) + " MW";
+  $("stOpen").textContent = "Distribuidor abierto: " + Math.round(opening() * 100) + " %";
+  $("stRot").textContent = "Giro: constante (sincronismo)";
+  drawChart();
+  if (window.__applyGates) window.__applyGates();
+}
+function drawChart() {
+  const c = $("chart"), g = c.getContext("2d"), W = c.width, Hh = c.height;
+  const m = { l: 58, r: 14, t: 16, b: 46 };
+  const st = getComputedStyle(document.documentElement);
+  const ink = st.getPropertyValue("--ink").trim(), mut = st.getPropertyValue("--muted").trim(), pri = st.getPropertyValue("--primary").trim(), bor = st.getPropertyValue("--border").trim(), warn = st.getPropertyValue("--warn").trim();
+  g.clearRect(0, 0, W, Hh);
+  const ymax = 1.5, xmax = 4;
+  const X = function (q) { return m.l + (q / xmax) * (W - m.l - m.r); };
+  const Y = function (pw) { return Hh - m.b - (pw / ymax) * (Hh - m.t - m.b); };
+  g.font = "15px sans-serif"; g.lineWidth = 1; g.strokeStyle = bor; g.fillStyle = mut;
+  for (let i = 0; i <= 3; i++) { const v = i * 0.5; g.beginPath(); g.moveTo(m.l, Y(v)); g.lineTo(W - m.r, Y(v)); g.stroke(); g.textAlign = "right"; g.fillText(fmt(v, 1), m.l - 6, Y(v) + 4); }
+  for (let q = 0; q <= 4; q++) { g.textAlign = "center"; g.fillText(String(q), X(q), Hh - m.b + 16); }
+  g.fillStyle = ink; g.textAlign = "center"; g.fillText("Caudal Q (m³/s)", (m.l + W - m.r) / 2, Hh - 6);
+  g.save(); g.translate(16, (m.t + Hh - m.b) / 2); g.rotate(-Math.PI / 2); g.fillText("Potencia (MW)", 0, 0); g.restore();
+  const k = RHO * G * S.H * S.eff / 100 / 1e6;
+  g.strokeStyle = pri; g.lineWidth = 3; g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(xmax), Y(k * xmax)); g.stroke();
+  const p = powers();
+  g.strokeStyle = warn; g.setLineDash([4, 4]); g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(X(S.Q), Y(0)); g.lineTo(X(S.Q), Y(p.pe)); g.lineTo(m.l, Y(p.pe)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = warn; g.beginPath(); g.arc(X(S.Q), Y(p.pe), 7, 0, 7); g.fill();
+  g.strokeStyle = "#fff"; g.lineWidth = 2; g.stroke();
+}
+
+/* ---------- escena ---------- */
+let renderer, scene, camera, controls, markers = [], particles, partGroups = [], clipMats = [], softMats = [], gates = [], rotating = [];
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+const TAU = Math.PI * 2;
+const RS = 1.9, RRUN = 1.15, PEN_LEN = 6.5;
+function rSp(th) { return 0.08 + 0.92 * Math.pow(Math.max(0, 1 - th / TAU), 0.65); }
+function RcSp(th) { return RS + 0.15 + rSp(th); }
+const R0 = RcSp(0);
+
+function mat(color, o) {
+  o = o || {};
+  const m = new THREE.MeshStandardMaterial({ color: color, metalness: o.metal !== undefined ? o.metal : 0.35, roughness: o.rough !== undefined ? o.rough : 0.5, side: THREE.DoubleSide, transparent: !!o.soft, opacity: 1 });
+  m.userData.base = 1; if (o.soft) { m.userData.soft = true; softMats.push(m); }
+  if (o.clip) { clipMats.push(m); }
+  return m;
+}
+function addPart(i, mesh) { (partGroups[i] = partGroups[i] || []).push(mesh); return mesh; }
+function lathe(points, seg, m) {
+  return new THREE.Mesh(new THREE.LatheGeometry(points.map(function (p) { return new THREE.Vector2(p[0], p[1]); }), seg || 72), m);
+}
+function bez(p0, p1, p2, t) {
+  const a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+  return [a * p0[0] + b * p1[0] + c * p2[0], a * p0[1] + b * p1[1] + c * p2[1]];
+}
+const CROWN = [[1.15, 0.40], [0.35, 0.42], [0.10, -1.05]];
+const BAND = [[1.15, -0.40], [1.05, -0.95], [0.66, -1.12]];
+
+function indexedFromGrid(pos, nU, nV, wrapV) {
+  const idx = [];
+  for (let i = 0; i < nU; i++) for (let j = 0; j < nV; j++) {
+    const a = i * (nV + 1) + j, b = a + nV + 1;
+    idx.push(a, b, a + 1, b, b + 1, a + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+function buildVolute() {
+  const nU = 180, nV = 40, p0 = -Math.PI + 0.55, p1 = Math.PI - 0.55, pos = [];
+  for (let i = 0; i <= nU; i++) {
+    const th = TAU * i / nU, r = rSp(th), Rc = RcSp(th), cx = Math.cos(th), sz = Math.sin(th);
+    for (let j = 0; j <= nV; j++) {
+      const ph = p0 + (p1 - p0) * j / nV, a = Math.cos(ph) * r, b = Math.sin(ph) * r;
+      pos.push((Rc + a) * cx, b, (Rc + a) * sz);
+    }
+  }
+  const m = mat(0x7b93a3, { soft: true, clip: true, metal: 0.4, rough: 0.45 });
+  return addPart(1, new THREE.Mesh(indexedFromGrid(pos, nU, nV), m));
+}
+function buildPenstock(group) {
+  const m = mat(0x7b93a3, { soft: true, metal: 0.4, rough: 0.45 });
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, PEN_LEN, 56, 1, true), m);
+  cyl.rotation.x = Math.PI / 2; cyl.position.set(R0, 0, -PEN_LEN / 2);
+  group.add(addPart(0, cyl));
+  const fm = mat(0x5d7482, { metal: 0.5, rough: 0.4 });
+  [-PEN_LEN, -PEN_LEN * 0.5, 0].forEach(function (z) {
+    const t = new THREE.Mesh(new THREE.TorusGeometry(1.03, 0.07, 14, 64), fm);
+    t.position.set(R0, 0, z); group.add(addPart(0, t));
+  });
+}
+function buildStayRing(group) {
+  const m = mat(0x4f6572, { clip: true, metal: 0.5, rough: 0.45 });
+  group.add(addPart(2, lathe([[1.22, 0.48], [2.1, 0.48], [2.1, 0.6], [1.22, 0.6], [1.22, 0.48]], 90, m)));
+  group.add(addPart(2, lathe([[1.22, -0.6], [2.1, -0.6], [2.1, -0.48], [1.22, -0.48], [1.22, -0.6]], 90, m)));
+  const vm = mat(0x9fb3bf, { clip: true, metal: 0.45, rough: 0.4 });
+  for (let i = 0; i < 12; i++) {
+    const ph = TAU * i / 12, b = 0.62;
+    const tx = -Math.sin(ph), tz = Math.cos(ph), rx = Math.cos(ph), rz = Math.sin(ph);
+    const cx = tx * Math.cos(0.6) - rx * Math.sin(0.6), cz = tz * Math.cos(0.6) - rz * Math.sin(0.6);
+    const v = new THREE.Mesh(new THREE.BoxGeometry(b, 0.96, 0.07), vm);
+    v.position.set(1.98 * Math.cos(ph), 0, 1.98 * Math.sin(ph)); v.rotation.y = Math.atan2(-cz, cx);
+    group.add(addPart(2, v));
+  }
+}
+function buildGates(group) {
+  const sh = new THREE.Shape();
+  sh.moveTo(-0.3, 0); sh.quadraticCurveTo(-0.1, 0.085, 0.3, 0.02); sh.quadraticCurveTo(0.1, -0.075, -0.3, 0);
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.84, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2); geo.translate(0, -0.42, 0);
+  const m = mat(0xd5a23a, { clip: true, metal: 0.55, rough: 0.35 });
+  const N = 20;
+  for (let i = 0; i < N; i++) {
+    const ph = TAU * i / N, v = new THREE.Mesh(geo, m);
+    v.position.set(1.55 * Math.cos(ph), 0, 1.55 * Math.sin(ph));
+    v.userData.ph = ph; gates.push(v); group.add(addPart(3, v));
+  }
+  window.__applyGates = function () {
+    const open = opening(), beta = open * 1.1;          // 0 = cerrado (tangente) … ≈63° abierto
+    gates.forEach(function (v) {
+      const ph = v.userData.ph, tx = -Math.sin(ph), tz = Math.cos(ph), rx = Math.cos(ph), rz = Math.sin(ph);
+      const cx = tx * Math.cos(beta) - rx * Math.sin(beta), cz = tz * Math.cos(beta) - rz * Math.sin(beta);
+      v.rotation.y = Math.atan2(-cz, cx);
+    });
+  };
+}
+function buildRunner(group) {
+  const blades = 13, nS = 30, nT = 10, sweep = -1.15, pos = [], idx = [];
+  for (let k = 0; k < blades; k++) {
+    const a0 = TAU * k / blades, base = pos.length / 3;
+    for (let i = 0; i <= nS; i++) {
+      const s = i / nS, c = bez(CROWN[0], CROWN[1], CROWN[2], s), b = bez(BAND[0], BAND[1], BAND[2], s);
+      for (let j = 0; j <= nT; j++) {
+        const t = j / nT, r = c[0] + (b[0] - c[0]) * t, y = c[1] + (b[1] - c[1]) * t;
+        const ang = a0 + sweep * Math.pow(s, 1.1) + 0.14 * (t - 0.5) * (1 - s);
+        pos.push(r * Math.cos(ang), y, r * Math.sin(ang));
+      }
+    }
+    for (let i = 0; i < nS; i++) for (let j = 0; j < nT; j++) {
+      const a = base + i * (nT + 1) + j, b = a + nT + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const bm = mat(0xe0b04f, { metal: 0.6, rough: 0.3 });
+  const blade = new THREE.Mesh(g, bm); group.add(addPart(4, blade));
+  const crownPts = [[0.001, 0.44]].concat([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map(function (s) { return bez(CROWN[0], CROWN[1], CROWN[2], s); }));
+  crownPts[1] = [1.15, 0.40];
+  const hubM = mat(0xb98a2f, { metal: 0.55, rough: 0.38 });
+  group.add(addPart(4, lathe(crownPts, 72, hubM)));
+}
+function buildShaftAndHead(group, rotGroup) {
+  const sm = mat(0xcfd6db, { metal: 0.75, rough: 0.25 });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.4, 32), sm);
+  shaft.position.y = 0.44 + 1.7; rotGroup.add(addPart(5, shaft));
+  const hm = mat(0x425a68, { clip: true, metal: 0.5, rough: 0.45 });
+  group.add(addPart(2, lathe([[0.3, 0.6], [2.1, 0.6], [2.1, 0.76], [0.58, 0.8], [0.52, 1.4], [0.3, 1.4], [0.3, 0.6]], 90, hm)));
+}
+function buildGenerator(group, rotGroup) {
+  const stm = mat(0x3d5a80, { clip: true, metal: 0.45, rough: 0.5 });
+  group.add(addPart(6, lathe([[1.55, 2.0], [1.98, 2.0], [1.98, 3.5], [1.55, 3.5], [1.55, 2.0]], 90, stm)));
+  const fm = mat(0x2f4766, { clip: true, metal: 0.5, rough: 0.5 });
+  group.add(addPart(6, lathe([[0.3, 3.5], [1.98, 3.5], [1.98, 3.62], [0.8, 3.66], [0.75, 4.1], [0.3, 4.1], [0.3, 3.5]], 90, fm)));
+  group.add(addPart(6, lathe([[0.3, 1.9], [1.98, 1.9], [1.98, 2.0], [0.3, 2.0], [0.3, 1.9]], 90, fm)));
+  const rm = mat(0x9aa7b0, { metal: 0.5, rough: 0.4 });
+  const rotor = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 1.2, 64), rm);
+  rotor.position.y = 2.75; rotGroup.add(addPart(6, rotor));
+  const pm = mat(0xc2703a, { metal: 0.5, rough: 0.4 });
+  for (let i = 0; i < 16; i++) {
+    const ph = TAU * i / 16, p = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.12, 0.26), pm);
+    p.position.set(1.3 * Math.cos(ph), 2.75, 1.3 * Math.sin(ph)); p.rotation.y = -ph; rotGroup.add(addPart(6, p));
+  }
+}
+function buildDraft(group) {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, -1.08, 0), new THREE.Vector3(0, -1.9, 0), new THREE.Vector3(0.05, -2.6, 0),
+    new THREE.Vector3(0.55, -3.35, 0), new THREE.Vector3(1.7, -3.8, 0), new THREE.Vector3(3.3, -4.0, 0), new THREE.Vector3(5.6, -4.05, 0)]);
+  window.__draftCurve = curve;
+  const nU = 90, nV = 40, frames = curve.computeFrenetFrames(nU, false), pos = [];
+  for (let i = 0; i <= nU; i++) {
+    const u = i / nU, p = curve.getPoint(u), N = frames.normals[i], B = frames.binormals[i], r = draftR(u);
+    for (let j = 0; j <= nV; j++) {
+      const ph = TAU * j / nV, c = Math.cos(ph) * r, s = Math.sin(ph) * r;
+      pos.push(p.x + c * N.x + s * B.x, p.y + c * N.y + s * B.y, p.z + c * N.z + s * B.z);
+    }
+  }
+  const m = mat(0x7b93a3, { soft: true, clip: true, metal: 0.4, rough: 0.45 });
+  group.add(addPart(7, new THREE.Mesh(indexedFromGrid(pos, nU, nV), m)));
+}
+function draftR(u) { return 0.66 + 0.78 * Math.pow(u, 0.85); }
+
+/* ---------- partículas de agua ---------- */
+function makeParticles(scn) {
+  const NP = 460, paths = [], lens = [];
+  const curve = window.__draftCurve, frames = curve.computeFrenetFrames(60, false);
+  const LUT = [];   // 0 = alta energía … 1 = ya cedió
+  (function () {
+    const a = new THREE.Color(0x1e63c8), b = new THREE.Color(0x29b6f6), c = new THREE.Color(0xe1f5fe);
+    for (let i = 0; i <= 64; i++) { const t = i / 64, col = t < 0.55 ? a.clone().lerp(b, t / 0.55) : b.clone().lerp(c, (t - 0.55) / 0.45); LUT.push(col); }
+  })();
+  function ramp(t) { return LUT[Math.max(0, Math.min(64, Math.round(t * 64)))]; }
+  for (let n = 0; n < NP; n++) {
+    let lr, ly; do { lr = Math.random() * 2 - 1; ly = Math.random() * 2 - 1; } while (lr * lr + ly * ly > 1);
+    const pts = [], st = [];
+    for (let k = 0; k <= 16; k++) { pts.push([R0 + lr * 0.72, ly * 0.72, -PEN_LEN + PEN_LEN * k / 16]); st.push(0.22 * k / 16); }
+    const the = 0.3 + (TAU - 0.3) * Math.random(), ns = Math.max(6, Math.round(the / TAU * 60));
+    for (let k = 1; k <= ns; k++) {
+      const th = the * k / ns, r = rSp(th), Rc = RcSp(th) + lr * 0.72 * r, y = ly * 0.72 * r;
+      pts.push([Rc * Math.cos(th), y, Rc * Math.sin(th)]); st.push(0.22 + 0.26 * k / ns);
+    }
+    const rStart = RcSp(the) + lr * 0.72 * rSp(the), yStart = ly * 0.72 * rSp(the), yin = (Math.random() * 2 - 1) * 0.34, sw = 0.55;
+    for (let k = 1; k <= 10; k++) {
+      const s = k / 10, e = s * s * (3 - 2 * s), r = rStart + (1.2 - rStart) * e, ang = the + sw * s, y = yStart + (yin - yStart) * e;
+      pts.push([r * Math.cos(ang), y, r * Math.sin(ang)]); st.push(0.48 + 0.12 * s);
+    }
+    const tc = (yin + 0.4) / 0.8, angRun0 = the + sw; let lastR = 0.4, lastA = angRun0;
+    for (let k = 1; k <= 18; k++) {
+      const s = k / 18, c = bez(CROWN[0], CROWN[1], CROWN[2], s), b = bez(BAND[0], BAND[1], BAND[2], s);
+      const r = c[0] + (b[0] - c[0]) * (1 - tc), y = c[1] + (b[1] - c[1]) * (1 - tc), ang = angRun0 + 1.5 * s;
+      pts.push([r * Math.cos(ang), y, r * Math.sin(ang)]); st.push(0.6 + 0.2 * s); lastR = r; lastA = ang;
+    }
+    const ox = lastR * Math.cos(lastA), oz = lastR * Math.sin(lastA), nD = 40;
+    for (let k = 1; k <= nD; k++) {
+      const u = k / nD, fi = Math.min(60, Math.round(u * 60)), p = curve.getPoint(u), N = frames.normals[fi], B = frames.binormals[fi], sc = draftR(u) / 0.66 * 0.95;
+      const a = ox * sc, b = oz * sc;
+      pts.push([p.x + a * N.x + b * B.x, p.y + a * N.y + b * B.y, p.z + a * N.z + b * B.z]); st.push(0.8 + 0.2 * u);
+    }
+    const cum = [0];
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k]; cum.push(cum[k - 1] + Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])); }
+    paths.push({ pts: pts, st: st, cum: cum, len: cum[cum.length - 1], s: 0, seg: 0 });
+  }
+  paths.forEach(function (p) { p.s = Math.random() * p.len; });
+  const geo = new THREE.BufferGeometry(), pos = new Float32Array(NP * 3), col = new Float32Array(NP * 3);
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  const cv = document.createElement("canvas"); cv.width = cv.height = 64; const cx = cv.getContext("2d");
+  const gr = cx.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.55, "rgba(255,255,255,.95)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  cx.fillStyle = gr; cx.fillRect(0, 0, 64, 64);
+  const pm = new THREE.PointsMaterial({ size: 0.2, vertexColors: true, map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, alphaTest: 0.05, sizeAttenuation: true });
+  const pts3 = new THREE.Points(geo, pm); pts3.frustumCulled = false; scn.add(pts3);
+  particles = { paths: paths, pos: pos, col: col, geo: geo, obj: pts3, ramp: ramp };
+}
+function stepParticles(dt) {
+  if (!particles) return;
+  const speed = 0.35 + 3.0 * (S.Q / 2.3) * 0.9, P = particles;
+  for (let n = 0; n < P.paths.length; n++) {
+    const p = P.paths[n]; p.s += speed * dt; if (p.s >= p.len) { p.s -= p.len; p.seg = 0; }
+    while (p.seg < p.cum.length - 2 && p.cum[p.seg + 1] < p.s) p.seg++;
+    const k = p.seg, f = (p.s - p.cum[k]) / Math.max(1e-6, p.cum[k + 1] - p.cum[k]), a = p.pts[k], b = p.pts[k + 1];
+    P.pos[n * 3] = a[0] + (b[0] - a[0]) * f; P.pos[n * 3 + 1] = a[1] + (b[1] - a[1]) * f; P.pos[n * 3 + 2] = a[2] + (b[2] - a[2]) * f;
+    const t = p.st[k] + (p.st[k + 1] - p.st[k]) * f, c = P.ramp(t);
+    P.col[n * 3] = c.r; P.col[n * 3 + 1] = c.g; P.col[n * 3 + 2] = c.b;
+  }
+  P.geo.attributes.position.needsUpdate = true; P.geo.attributes.color.needsUpdate = true;
+}
+
+/* ---------- selección, vista, explosión ---------- */
+function select(i) {
+  S.sel = i;
+  Array.prototype.forEach.call($("parts").children, function (li, k) { li.classList.toggle("sel", k === i); });
+  markers.forEach(function (m, k) { m.el.classList.toggle("sel", k === i); });
+  $("pdesc").innerHTML = i < 0 ? "Tocá un número del modelo o de esta lista para ver qué hace cada pieza." : "<b>" + (i + 1) + ". " + PARTS[i].n + "</b><br>" + PARTS[i].d;
+  partGroups.forEach(function (list, k) {
+    (list || []).forEach(function (mesh) {
+      const m = mesh.material, isSoft = !!m.userData.soft;
+      const target = i < 0 ? (isSoft ? softOpacity() : 1) : (k === i ? 1 : 0.14);
+      m.userData.base = target; m.transparent = isSoft || i >= 0; m.opacity = target; m.needsUpdate = true;
+      if (m.emissive) m.emissive.setHex(k === i ? 0x331a00 : 0x000000);
+    });
+  });
+}
+function softOpacity() { return S.cut ? 1 : 0.28; }
+function applyCut() {
+  clipMats.forEach(function (m) { m.clippingPlanes = S.cut ? [clipPlane] : []; m.needsUpdate = true; });
+  if (S.sel < 0) softMats.forEach(function (m) { m.opacity = softOpacity(); m.userData.base = softOpacity(); m.needsUpdate = true; });
+  else select(S.sel);
+  softMats.forEach(function (m) { m.depthWrite = S.cut; });
+}
+const EXP = { 0: [0, 0, -1.8], 1: [0, 0, 0], 2: [0, 0.5, 0], 3: [0, 0.9, 0], 4: [0, -1.1, 0], 5: [0, 1.9, 0], 6: [0, 3.4, 0], 7: [0, -2.3, 0] };
+let partRoots = {};
+function applyExplode() {
+  const e = S.explode / 100;
+  Object.keys(partRoots).forEach(function (k) { const v = EXP[k]; partRoots[k].position.set(v[0] * e, v[1] * e, v[2] * e); });
+}
+
+/* ---------- inicio ---------- */
+function init() {
+  const canvas = $("gl"), stage = $("stage");
+  try {
+    if (typeof THREE === "undefined") throw new Error("three");
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
+  } catch (err) { $("nogl").style.display = "flex"; $("legend").style.display = "none"; $("toolbar").style.display = "none"; $("status").style.display = "none"; return false; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.localClippingEnabled = true;
+  scene = new THREE.Scene();
+  // fondo con degradado
+  const bgc = document.createElement("canvas"); bgc.width = 4; bgc.height = 256; const bx = bgc.getContext("2d");
+  const gg = bx.createLinearGradient(0, 0, 0, 256); gg.addColorStop(0, CFG.scene.top); gg.addColorStop(1, CFG.scene.bottom); bx.fillStyle = gg; bx.fillRect(0, 0, 4, 256);
+  scene.background = new THREE.CanvasTexture(bgc);
+  camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+  controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true; controls.dampingFactor = 0.08; controls.minDistance = 5; controls.maxDistance = 40; controls.autoRotateSpeed = 1.1;
+  resetView();
+  scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+  scene.add(new THREE.HemisphereLight(0xdff1ff, 0x30404a, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 0.95); key.position.set(8, 12, 10); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xbfd8ff, 0.35); fill.position.set(-9, 4, -6); scene.add(fill);
+
+  const root = new THREE.Group(); scene.add(root);
+  function sub(i) { const g = new THREE.Group(); root.add(g); partRoots[i] = g; return g; }
+  const gPen = sub(0), gVol = sub(1), gStay = sub(2), gGate = sub(3), gRun = sub(4), gShaft = sub(5), gGen = sub(6), gDraft = sub(7);
+  buildPenstock(gPen);
+  gVol.add(buildVolute());
+  buildStayRing(gStay);
+  buildGates(gGate);
+  const runRot = new THREE.Group(); gRun.add(runRot); buildRunner(runRot); rotating.push(runRot);
+  const shaftRot = new THREE.Group(); gShaft.add(shaftRot); buildShaftAndHead(gStay, shaftRot); rotating.push(shaftRot);
+  const genRot = new THREE.Group(); gGen.add(genRot); buildGenerator(gGen, genRot); rotating.push(genRot);
+  buildDraft(gDraft);
+  makeParticles(scene);
+
+  const floor = new THREE.GridHelper(26, 26, new THREE.Color(CFG.scene.grid), new THREE.Color(CFG.scene.grid));
+  floor.position.set(1.2, -6.5, -2.5); floor.material.transparent = true; floor.material.opacity = 0.5; scene.add(floor);
+
+  // marcadores numerados
+  const anchors = [[R0, 0.2, -3.6], [-3.35, 0.25, 0], [0.4, 0.58, -2.0], [-1.1, 0.46, -1.1], [0.7, -0.45, 0.95], [0, 1.9, 0.18], [1.95, 3.05, 0], [0.95, -2.2, 0]];
+  const lab = $("labels");
+  anchors.forEach(function (a, i) {
+    const el = document.createElement("div"); el.className = "mk"; el.innerHTML = (i + 1) + '<span class="tip">' + PARTS[i].n + "</span>";
+    el.addEventListener("click", function () { select(S.sel === i ? -1 : i); }); lab.appendChild(el);
+    markers.push({ el: el, v: new THREE.Vector3(a[0], a[1], a[2]), part: i });
+  });
+  window.__applyGates(); applyCut(); applyExplode();
+  resize(); window.addEventListener("resize", resize);
+  return true;
+}
+function resetView() { camera.position.set(9.8, 5.2, 12.4); controls.target.set(1.2, -0.7, -0.6); controls.update(); }
+function resize() {
+  if (!renderer) return;
+  const st = $("stage"), w = st.clientWidth, h = st.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+let last = performance.now();
+const TMPV = new THREE.Vector3();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const w = 3.2 * (S.Q > QMIN * 1.01 ? 1 : 0.0);
+  rotating.forEach(function (g) { g.rotation.y -= w * dt; });
+  if (S.flow) stepParticles(dt);
+  particles.obj.visible = S.flow;
+  controls.autoRotate = S.spin; controls.update();
+  renderer.render(scene, camera);
+  const st = $("stage"), W = st.clientWidth, H = st.clientHeight, v = TMPV;
+  markers.forEach(function (m) {
+    const e = S.explode / 100, off = EXP[m.part];
+    v.set(m.v.x + off[0] * e, m.v.y + off[1] * e, m.v.z + off[2] * e).project(camera);
+    const vis = v.z < 1 && v.z > -1;
+    m.el.style.display = vis ? "flex" : "none";
+    m.el.style.transform = "translate(" + ((v.x * 0.5 + 0.5) * W).toFixed(1) + "px," + ((-v.y * 0.5 + 0.5) * H).toFixed(1) + "px)";
+  });
+}
+
+/* ---------- arranque ---------- */
+setupPanel(); refresh();
+if (init()) {
+  $("bCut").addEventListener("click", function () { S.cut = !S.cut; this.classList.toggle("on", S.cut); applyCut(); });
+  $("bFlow").addEventListener("click", function () { S.flow = !S.flow; this.classList.toggle("on", S.flow); });
+  $("bSpin").addEventListener("click", function () { S.spin = !S.spin; this.classList.toggle("on", S.spin); });
+  $("bReset").addEventListener("click", function () { resetView(); $("sExp").value = 0; S.explode = 0; applyExplode(); select(-1); });
+  $("sExp").addEventListener("input", function () { S.explode = parseFloat(this.value); applyExplode(); });
+  requestAnimationFrame(loop);
+}
+})();
+</script>
+</body>
+</html>
