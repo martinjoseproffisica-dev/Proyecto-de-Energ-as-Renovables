@@ -53,11 +53,31 @@ THEMES = {
                       calloutBar="#E08A2E", link="#8A3B0E", heroA="58,24,12", heroB="180,84,26", mapStyle="open-street-map", hue="-141deg",
                       warn="#2A6FB0", sceneTop="#f6ebdc", sceneBottom="#d9bfa3", grid="#b99b80", dark=False,
                       c1="#C4571A", c2="#2A6FB0", c3="#7A3B12"),
+    "Lavanda": dict(icon="🟣", bg="#F6F3FB", surface="#FFFFFF", surface2="#ECE6F7", ink="#251A3A", muted="#6B5E86", primary="#5B3FA3",
+                    primaryInk="#FFFFFF", border="#E0D8F0", accent="#D8C8FF", sidebar="#2A1B4D", sidebarInk="#F3EEFF", calloutBg="#E9E0F8",
+                    calloutBar="#8A63D2", link="#4B2E9A", heroA="34,20,72", heroB="91,63,163", mapStyle="open-street-map", hue="95deg",
+                    warn="#D9822B", sceneTop="#efe9f8", sceneBottom="#c9bde0", grid="#a597c4", dark=False,
+                    c1="#6B4BC0", c2="#E1A52E", c3="#2864B4"),
+    "Coral": dict(icon="🔴", bg="#FFF4F2", surface="#FFFFFF", surface2="#FDE3DE", ink="#3A1A1A", muted="#845650", primary="#C8453A",
+                  primaryInk="#FFFFFF", border="#F3D6D0", accent="#FFC1B5", sidebar="#4A1F1B", sidebarInk="#FFEFEA", calloutBg="#FCE0DA",
+                  calloutBar="#E26A5A", link="#9B2C22", heroA="74,26,22", heroB="200,69,58", mapStyle="open-street-map", hue="-159deg",
+                  warn="#2A6FB0", sceneTop="#fbeae6", sceneBottom="#e3bdb5", grid="#c69a92", dark=False,
+                  c1="#C8453A", c2="#2A6FB0", c3="#7A2A22"),
     "Noche": dict(icon="⚫", bg="#0E1A1B", surface="#162A2C", surface2="#1C3436", ink="#E8F1EE", muted="#9DB5AF", primary="#4FD1A5",
                   primaryInk="#06231B", border="#2A4443", accent="#C9F36B", sidebar="#091112", sidebarInk="#E8F1EE", calloutBg="#1C3B37",
                   calloutBar="#4FD1A5", link="#7CC7F2", heroA="4,18,18", heroB="20,107,85", mapStyle="carto-darkmatter", hue="0deg",
                   warn="#F0B24A", sceneTop="#14282a", sceneBottom="#0a1516", grid="#35504f", dark=True,
                   c1="#4FD1A5", c2="#F0B24A", c3="#7CC7F2"),
+    "Medianoche": dict(icon="🔷", bg="#0B1220", surface="#131D33", surface2="#1A2742", ink="#E6ECF8", muted="#93A3C2", primary="#5DA9FF",
+                       primaryInk="#06142B", border="#24324F", accent="#9BD1FF", sidebar="#070C17", sidebarInk="#E6ECF8", calloutBg="#172A4A",
+                       calloutBar="#5DA9FF", link="#8CC4FF", heroA="5,12,30", heroB="30,80,150", mapStyle="carto-darkmatter", hue="49deg",
+                       warn="#F0B24A", sceneTop="#14213a", sceneBottom="#080e1b", grid="#2f4468", dark=True,
+                       c1="#5DA9FF", c2="#F0B24A", c3="#A78BFA"),
+    "Aurora": dict(icon="🟪", bg="#130E22", surface="#1E1634", surface2="#281D45", ink="#EDE8FA", muted="#A99CCB", primary="#B794F6",
+                   primaryInk="#1A0F33", border="#33264F", accent="#7EF0D2", sidebar="#0D0817", sidebarInk="#EDE8FA", calloutBg="#2A1F4A",
+                   calloutBar="#B794F6", link="#C9B2FF", heroA="19,10,40", heroB="90,50,160", mapStyle="carto-darkmatter", hue="102deg",
+                   warn="#F0B24A", sceneTop="#1c1433", sceneBottom="#0c0716", grid="#44366b", dark=True,
+                   c1="#B794F6", c2="#7EF0D2", c3="#F0B24A"),
 }
 
 PAGES = ["Presentación del equipo", "Inicio", "La investigación", "Documentos y docentes", "Mapa energético local", "Cruz del Eje",
@@ -69,6 +89,7 @@ ss.setdefault("theme", "Bosque")
 ss.setdefault("page", PAGES[0])
 ss.setdefault("nav_count", 0)
 ss.setdefault("scroll_pending", False)
+ss.setdefault("bg_level", 5)
 
 
 def go_to(page):
@@ -84,6 +105,37 @@ def set_theme(name):
 
 T = THEMES[ss["theme"]]
 
+
+def physics_bg(color, level):
+    """Mosaico SVG de símbolos y fórmulas de Física, muy tenue, para el fondo de la página."""
+    if level <= 0:
+        return "none"
+    from urllib.parse import quote
+    o = level / 100
+    svg = f"""<svg xmlns='http://www.w3.org/2000/svg' width='560' height='420' viewBox='0 0 560 420'>
+<g fill='none' stroke='{color}' stroke-width='1.5' opacity='{o}'>
+<g transform='translate(95,85)'><ellipse rx='46' ry='16'/><ellipse rx='46' ry='16' transform='rotate(60)'/><ellipse rx='46' ry='16' transform='rotate(120)'/><circle r='5' fill='{color}'/><circle cx='46' r='3.5' fill='{color}'/><circle cx='-23' cy='-40' r='3.5' fill='{color}'/></g>
+<path d='M210 78 q20 -34 40 0 t40 0 t40 0 t40 0'/>
+<path d='M30 205 h22 l8 -15 l14 30 l14 -30 l14 30 l8 -15 h22 M30 205 v-14 M144 205 v-14'/>
+<path d='M455 140 L488 250'/><circle cx='490' cy='258' r='11'/><path d='M420 262 Q490 290 560 262' stroke-dasharray='4 6'/>
+<rect x='215' y='300' width='84' height='28'/><path d='M257 300 v28'/><path d='M222 298 C165 230 350 230 292 298' stroke-dasharray='5 5'/><path d='M230 298 C190 255 325 255 285 298'/>
+<path d='M30 400 Q120 300 215 400' stroke-dasharray='3 7'/>
+<path d='M345 190 v50 M345 190 l-6 10 M345 190 l6 10 M335 215 h20'/>
+</g>
+<g fill='{color}' opacity='{o}' font-family='Georgia, Times, serif' font-style='italic'>
+<text x='392' y='68' font-size='24' transform='rotate(-5 392 68)'>E = mc²</text>
+<text x='170' y='168' font-size='20' transform='rotate(4 170 168)'>P = ρ·g·Q·H</text>
+<text x='40' y='295' font-size='20' transform='rotate(-4 40 295)'>Q = m·c·ΔT</text>
+<text x='360' y='345' font-size='20'>F = m·a</text>
+<text x='400' y='398' font-size='18' transform='rotate(-3 400 398)'>V = I·R</text>
+<text x='238' y='395' font-size='15'>p + ½ρv² + ρgh = cte</text>
+<text x='40' y='140' font-size='17' transform='rotate(-8 40 140)'>ε = −ΔΦ/Δt</text>
+<text x='380' y='290' font-size='17'>Ec = ½mv²</text>
+<text x='455' y='195' font-size='17'>λ = v/f</text>
+<text x='222' y='320' font-size='14' stroke='none'>N         S</text>
+</g></svg>"""
+    return "url(\"data:image/svg+xml;utf8," + quote(svg) + "\")"
+
 # ───────────────────────── Estilos ─────────────────────────
 CSS = Template("""
 <style>
@@ -92,10 +144,11 @@ CSS = Template("""
         --border:$border; --accent:$accent; --callout:$calloutBg; --calloutBar:$calloutBar; --link:$link; --warn:$warn; }
 html, body, [class*="css"] { font-family:'DM Sans',sans-serif; }
 .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background:var(--bg) !important; color:var(--ink) !important; }
+[data-testid="stMain"] { background-image:$bgimg !important; background-size:560px 420px !important; background-repeat:repeat !important; }
 [data-testid="stHeader"] { background:transparent !important; }
 [data-testid="stHeader"] * { color:var(--ink) !important; }
 [data-testid="stToolbar"] { opacity:.85; }
-.block-container { padding-top:2.2rem !important; max-width:1280px; }
+.block-container { padding-top:1.1rem !important; max-width:1280px; }
 h1,h2,h3,h4 { font-family:'Space Grotesk',sans-serif !important; letter-spacing:-.03em; color:var(--ink) !important; }
 [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] li,
 label, [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p { color:var(--ink) !important; }
@@ -149,10 +202,21 @@ hr { border-color:var(--border) !important; }
 [data-testid="stIFrame"] iframe, iframe { border:0; border-radius:16px; color-scheme:normal; }
 footer { visibility:hidden; }
 
-/* Barra superior con selector de tema */
-.topbrand { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.05rem; color:var(--ink); padding-top:.45rem; }
-.topbrand small { display:block; font-family:'DM Sans',sans-serif; font-weight:500; font-size:.78rem; color:var(--muted); }
-.themelabel { text-align:right; font-size:.8rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding-top:.7rem; }
+/* Barra superior compacta con selector de tema */
+.topbar-brand { font-size:.8rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.topbar-brand b { color:var(--ink); font-family:'Space Grotesk',sans-serif; font-size:.9rem; }
+.topline { border-bottom:1px solid var(--border); margin:.2rem 0 1.1rem; }
+[data-testid="stPopover"] button { padding:.15rem .6rem !important; min-height:2rem !important; font-size:.82rem !important; background:var(--surface) !important; border:1px solid var(--border) !important; color:var(--ink) !important; border-radius:999px !important; }
+[data-testid="stPopover"] button * { color:var(--ink) !important; }
+[data-testid="stPopoverBody"] { background:var(--surface) !important; border:1px solid var(--border) !important; border-radius:16px !important; min-width:min(620px, 92vw); }
+[data-testid="stPopoverBody"] * { color:var(--ink) !important; }
+[data-testid="stPopoverBody"] [data-testid="stBaseButton-secondary"] { background:var(--surface2) !important; border:1px solid var(--border) !important; border-radius:10px !important; padding:.2rem .4rem !important; min-height:2rem !important; font-size:.82rem !important; }
+[data-testid="stPopoverBody"] [data-testid="stBaseButton-primary"] { background:var(--primary) !important; border:1px solid var(--primary) !important; border-radius:10px !important; padding:.2rem .4rem !important; min-height:2rem !important; font-size:.82rem !important; }
+[data-testid="stPopoverBody"] [data-testid="stBaseButton-primary"], [data-testid="stPopoverBody"] [data-testid="stBaseButton-primary"] * { color:var(--primaryInk) !important; }
+/* Botón para abrir y cerrar el menú lateral, siempre visible */
+[data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapseButton"] button { background:var(--surface) !important; border:1px solid var(--border) !important; border-radius:10px !important; }
+[data-testid="stExpandSidebarButton"], [data-testid="stExpandSidebarButton"] * { color:var(--ink) !important; }
+[data-testid="stSidebarCollapseButton"] button { background:rgba(255,255,255,.12) !important; border-color:rgba(255,255,255,.3) !important; }
 
 /* Componentes propios */
 .hero { padding:2.8rem 2.8rem 2.5rem; border-radius:24px; color:#fff; min-height:370px; display:flex; flex-direction:column; justify-content:flex-end;
@@ -196,7 +260,7 @@ table.tbl td.dim { color:var(--muted); }
 .phase h3 { margin:.1rem 0 .3rem; }
 </style>
 """)
-st.markdown(CSS.substitute(**T), unsafe_allow_html=True)
+st.markdown(CSS.substitute(bgimg=physics_bg(T["ink"], ss["bg_level"]), **T), unsafe_allow_html=True)
 
 # Al cambiar de sección, la página vuelve al comienzo. El contador cambia el texto del script
 # en cada navegación para que el navegador lo ejecute siempre (si el texto fuera idéntico, se reutilizaría).
@@ -219,6 +283,8 @@ if ss.pop("scroll_pending", False):
 
 # ───────────────────────── Utilidades de interfaz ─────────────────────────
 def heading(kicker, title, desc=None):
+    # el número del encabezado es el mismo que el del menú lateral
+    kicker = f"{PAGES.index(ss['page']):02d} · {kicker.split('·', 1)[-1].strip()}"
     st.markdown(f'<div class="section-label">{kicker}</div><h1 style="margin-top:.2rem">{title}</h1>', unsafe_allow_html=True)
     if desc:
         st.markdown(desc)
@@ -287,29 +353,34 @@ with st.sidebar:
     st.markdown("## ⚡ Energía renovable")
     st.caption("Investigación educativa · Cruz del Eje")
     for i, p in enumerate(PAGES):
-        label = p if i == 0 else f"{i:02d} · {p}"
+        label = f"{i:02d} · {p}"
         st.button(label, key=f"nav_{i}", on_click=go_to, args=(p,), type="primary" if p == ss["page"] else "secondary", **STRETCH)
     st.divider()
     st.markdown("**Profesorado Universitario de Física**")
     st.caption("UPC · Sede Cruz del Eje · 2026")
     st.caption("Proyecto académico interactivo")
 
-top = st.columns([1.9, 0.5, 1, 1, 1, 1], vertical_alignment="center")
-with top[0]:
-    st.markdown('<div class="topbrand">La energía renovable como contenido escolar<small>Profesorado Universitario de Física · UPC · 2026</small></div>', unsafe_allow_html=True)
-with top[1]:
-    st.markdown('<div class="themelabel">Tema</div>', unsafe_allow_html=True)
-for col, (name, th) in zip(top[2:], THEMES.items()):
-    with col:
-        st.button(f"{th['icon']} {name}", key=f"theme_{name}", on_click=set_theme, args=(name,),
-                  type="primary" if ss["theme"] == name else "secondary", **STRETCH)
-st.write("")
+tb_l, tb_r = st.columns([5, 1.25], vertical_alignment="center")
+with tb_l:
+    st.markdown('<div class="topbar-brand"><b>⚡ La energía renovable como contenido escolar</b><span> · Profesorado Universitario de Física · UPC · 2026</span></div>', unsafe_allow_html=True)
+with tb_r:
+    with st.popover(f"🎨 Tema · {ss['theme']}", **STRETCH):
+        st.caption("Elegí una gama de colores")
+        names = list(THEMES.keys())
+        for r in range(0, len(names), 4):
+            cols = st.columns(4)
+            for col, name in zip(cols, names[r:r + 4]):
+                with col:
+                    st.button(f"{THEMES[name]['icon']} {name}", key=f"theme_{name}", on_click=set_theme, args=(name,),
+                              type="primary" if ss["theme"] == name else "secondary", **STRETCH)
+        st.slider("Fondo de física (0 = sin fondo)", 0, 20, key="bg_level")
+st.markdown('<div class="topline"></div>', unsafe_allow_html=True)
 
 page = ss["page"]
 
 # ═════════════════════════ PÁGINAS ═════════════════════════
 def page_portada():
-    st.markdown('<div class="eyebrow">Profesorado Universitario de Física · UPC · Sede Cruz del Eje · 4.° año · 2026</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">00 · Presentación del equipo · Profesorado Universitario de Física · UPC · 4.° año · 2026</div>', unsafe_allow_html=True)
     st.markdown('<h1 style="font-size:clamp(2.2rem,4.6vw,3.9rem);line-height:1.02;margin:.35rem 0 .4rem">La energía renovable como contenido escolar</h1>', unsafe_allow_html=True)
     st.markdown("**Análisis curricular y propuestas de transposición didáctica en Cruz del Eje y Córdoba**")
     st.write("")
@@ -333,7 +404,7 @@ def page_portada():
 
 
 def page_inicio():
-    st.markdown("""<div class="hero"><div class="eyebrow">Investigación · Educación · Territorio</div>
+    st.markdown("""<div class="hero"><div class="eyebrow">01 · Inicio · Investigación · Educación · Territorio</div>
 <h1>La energía renovable como contenido escolar</h1>
 <p>Análisis curricular y propuestas de transposición didáctica en Cruz del Eje y Córdoba.</p>
 <div><span class="pill">Inicial</span><span class="pill">Primario</span><span class="pill">Secundario</span><span class="pill">Superior</span></div></div>""", unsafe_allow_html=True)
@@ -838,7 +909,7 @@ with nl:
     if idx > 0:
         st.button("← Anterior", key="prev", on_click=go_to, args=(PAGES[idx - 1],), **STRETCH)
 with nm:
-    st.markdown(f'<div class="nav-note" style="text-align:center;padding-top:.55rem">Sección {idx + 1} de {len(PAGES)} · {page}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="nav-note" style="text-align:center;padding-top:.55rem">Sección {idx:02d} de {len(PAGES) - 1:02d} · {page}</div>', unsafe_allow_html=True)
 with nr:
     if idx < len(PAGES) - 1:
         st.button("Siguiente →", key="next", type="primary", on_click=go_to, args=(PAGES[idx + 1],), **STRETCH)

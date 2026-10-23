@@ -1,8 +1,9 @@
-# La energía renovable como contenido escolar (versión 7)
+# La energía renovable como contenido escolar (versión 8)
 
 Aplicación académica interactiva con Streamlit, Plotly y three.js.
 
 ## Qué cambió en esta versión
+- **Versión 8**: selector de tema compacto (botón «Tema» con 8 gamas), fondo de Física muy tenue con intensidad regulable, barra superior de una línea, menú lateral que se cierra y se abre en todas las secciones, y numeración del menú igual a la del encabezado de cada sección (00 a 10).
 - **Portada**: solo la foto del equipo y todos los datos (integrantes, espacios curriculares, profesores). El cartel verde queda en «Inicio».
 - **Temas**: cuatro opciones arriba a la derecha (Bosque, Océano, Atardecer, Noche).
 - **Navegación**: al tocar «Siguiente», «Anterior», «Comenzar» o el menú, la página vuelve al comienzo.
